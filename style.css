@@ -1,7 +1,7 @@
 /* --- 基本設定 --- */
 :root {
     --b5-ratio: 1.4142; /* B5縦 (√2) */
-    --toolbar-height: 60px; /* [v5修正] ツールバーの高さを 60px に */
+    --toolbar-height: 60px; /* [v6修正] ツールバーの高さを 60px に */
     --page-gap: 20px; /* ページ間の余白 */
     --gutter-h: 18px; /* 横ガター幅 */
     --gutter-v: 9px;  /* 縦ガター幅 */
@@ -23,7 +23,7 @@ body, html {
     flex-direction: column;
 }
 
-/* --- ツールバー (v5 縦書きボタン対応) --- */
+/* --- ツールバー (v6 縦書きボタン対応) --- */
 #toolbar {
     display: flex;
     align-items: center;
@@ -41,28 +41,34 @@ body, html {
 #toolbar::-webkit-scrollbar-track { background: #444; }
 #toolbar::-webkit-scrollbar-thumb { background-color: #888; border-radius: 3px; }
 
-/* [v5修正] 縦書きボタン対応 */
+/* [v6修正] 縦書きボタン対応 */
 #toolbar button {
     background: #666;
     border: 1px solid #888;
     color: white;
-    padding: 4px 6px; /* [v5修正] 余白調整 */
+    padding: 4px 6px; 
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
     flex-shrink: 0;
-    white-space: normal; /* [v5修正] <br> を許可 */
-    line-height: 1.25;  /* [v5修正] 行間詰める */
-    font-size: 0.8rem;  /* [v5修正] 文字を小さく */
-    height: calc(var(--toolbar-height) - 16px); /* [v5修正] 高さを指定 */
+    white-space: normal; /* <br> を許可 */
+    line-height: 1.25;  
+    font-size: 0.8rem;  
+    height: calc(var(--toolbar-height) - 16px); 
     box-sizing: border-box;
+    /* [v6] 縦書きボタンのセンタリング */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
 }
 #toolbar button:hover { background: #777; }
 #toolbar button.active { background: #007bff; border-color: #0056b3; }
 
 #toolbar .separator {
     width: 1px;
-    height: 36px; /* [v5修正] 高さを調整 */
+    height: 36px; 
     background-color: #555;
     margin: 0 4px;
     flex-shrink: 0;
@@ -79,20 +85,20 @@ body, html {
 #toolbar label {
     font-weight: bold;
     flex-shrink: 0;
-    font-size: 1rem; /* [v5修正] 通常サイズ */
+    font-size: 1rem; 
     line-height: 1;
 }
 #sliderFontSize {
     width: 60px; 
     flex-shrink: 0;
-    height: auto; /* [v5修正] 高さをリセット */
+    height: auto; 
 }
 #fontSizeValue {
     width: 40px;
     text-align: right;
     font-size: 0.9em;
     flex-shrink: 0;
-    line-height: 1; /* [v5修正] 高さをリセット */
+    line-height: 1; 
 }
 #btnReset {
     background: #a00;
@@ -102,7 +108,7 @@ body, html {
 }
 
 
-/* --- キャンバス領域 (v4から変更なし) --- */
+/* --- キャンバス領域 --- */
 #canvasContainer {
     flex-grow: 1;
     overflow-y: auto; 
@@ -114,20 +120,20 @@ body, html {
     position: relative; 
 }
 
-/* ページラッパー (v4から変更なし) */
+/* ページラッパー */
 .page-wrapper {
     width: 100%;
     margin-bottom: var(--page-gap); 
     box-sizing: border-box;
 }
 
-/* アクティブページのハイライト (v4から変更なし) */
+/* アクティブページのハイライト */
 .page-wrapper.active .mainCanvas {
     outline: 3px solid #007bff;
     box-shadow: 0 0 15px rgba(0,123,255,0.7);
 }
 
-/* [v5修正] canvasのスタイル */
+/* [v6修正] canvasのスタイル */
 .mainCanvas {
     width: 100%; 
     height: auto; 
@@ -137,7 +143,7 @@ body, html {
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     cursor: default;
     
-    /* [v5修正] ダブルタップズーム禁止、縦スクロールは許可 */
+    /* [v6修正] ダブルタップズーム禁止、縦スクロールは許可 */
     touch-action: manipulation;
 }
 .mainCanvas.tool-serif {
@@ -147,13 +153,13 @@ body, html {
     cursor: crosshair;
     touch-action: none; 
 }
-/* [v5追加] フキダシドラッグ中のスクロールを禁止 */
+/* [v6追加] フキダシドラッグ中のスクロールを禁止 */
 .mainCanvas.dragging {
     touch-action: none;
 }
 
 
-/* --- フキダシ入力エリア (v4から変更なし) --- */
+/* --- フキダシ入力エリア --- */
 #bubbleEditor {
     position: absolute;
     display: none;
@@ -175,7 +181,7 @@ body, html {
 #bubbleEditor::-webkit-scrollbar { height: 6px; }
 #bubbleEditor::-webkit-scrollbar-thumb { background-color: #888; }
 
-/* --- 選択パネル (v5 縦書きボタン対応) --- */
+/* --- 選択パネル --- */
 .selection-panel {
     position: fixed; 
     bottom: 20px; 
@@ -204,14 +210,14 @@ body, html {
 .selection-panel button:hover {
     background: #777;
 }
-/* [v5修正] 縦書きボタン */
+/* [v6修正] 縦書きボタン */
 .selection-panel button.vertical-btn {
     writing-mode: vertical-rl;
     text-orientation: upright;
     padding: 10px 6px;
     line-height: 1.2;
     font-weight: bold;
-    height: 60px; /* [v5修正] 高さを 60px に調整 */
+    height: 60px; /* [v6修正] 高さを 60px に調整 */
 }
 /* 削除ボタン */
 .selection-panel button.delete {
@@ -219,6 +225,21 @@ body, html {
 }
 .selection-panel button.delete:hover {
     background: #e00;
+}
+
+/* [v6新設] ページ番号表示 */
+#pageIndicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    z-index: 10;
+    pointer-events: none; /* タップを透過 */
 }
 
 

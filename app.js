@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- 定数 (v5) ---
-    const STORAGE_KEY = 'manganame_v5'; // [v5]
+    // --- 定数 (v6) ---
+    const STORAGE_KEY = 'manganame_v6'; // [v6]
     const B5_ASPECT_RATIO = Math.sqrt(2); 
     const PAGE_FRAME_PADDING = 15; 
     const GUTTER_H = 18; 
@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const BUBBLE_LINE_HEIGHT = 1.2; 
     const SNAP_ANGLE_THRESHOLD = 15; 
     const KOMA_TAP_THRESHOLD = 3; // タップとみなす移動距離
-    const KOMA_HIT_THRESHOLD = 30; // [v5修正] コマ枠の当たり判定を30pxに拡大
+    const KOMA_HIT_THRESHOLD = 30; // [v6修正] コマ枠の当たり判定を30pxに拡大
 
     // --- DOM要素 ---
     const canvasContainer = document.getElementById('canvasContainer');
@@ -41,6 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // テキスト編集
     const bubbleEditor = document.getElementById('bubbleEditor');
     const textIO = document.getElementById('textIO');
+    
+    // [v6新設] ページ番号表示
+    const pageIndicator = document.getElementById('pageIndicator');
+
 
     // --- アプリケーション状態 ---
     let state = {
@@ -60,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDraggingBubble = false; // フキダシドラッグ用
     let dragStartX = 0, dragStartY = 0;
     let dragCurrentX = 0, dragCurrentY = 0;
-    let dragBubbleOffsetX = 0, dragBubbleOffsetY = 0; // [v5] フキダシ「右上」とのオフセット
+    let dragBubbleOffsetX = 0, dragBubbleOffsetY = 0; 
 
     // --- 初期化 ---
     function init() {
@@ -71,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resizeAllCanvas(); 
         updateUI();
         setActivePage(state.currentPageIndex, false); 
+        updatePageIndicator(); // [v6] 初期表示
     }
 
     // --- PWA (Service Worker) ---
@@ -227,6 +232,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!selectedBubble) {
             hideBubbleEditor();
         }
+        
+        updatePageIndicator(); // [v6] ページ番号を更新
+    }
+
+    // [v6新設] ページ番号UIを更新
+    function updatePageIndicator() {
+        if (pageIndicator) {
+            pageIndicator.textContent = `${state.currentPageIndex + 1} / ${state.pages.length}`;
+        }
     }
 
     // --- アクティブページ設定 ---
@@ -241,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activeElement.wrapper.classList.add('active');
         
         state.currentPageIndex = index;
+        updatePageIndicator(); // [v6] アクティブ変更時にページ番号を更新
 
         if (scrollToPage) {
             activeElement.wrapper.scrollIntoView({
@@ -288,50 +303,18 @@ document.addEventListener('DOMContentLoaded', () => {
         context.strokeRect(x, y, w, h);
     }
 
-    // [v5修正] コマ枠の延長ロジック
+    // [v6修正] コマ枠の延長ロジック (描画時に動的計算)
     function drawKoma(page, context, isExport = false) {
         if (!page.frame) return;
-        const { x: fx, y: fy, w: fw, h: fh } = page.frame;
 
         page.gutters.forEach(gutter => {
-            const { dir, pos, bounds } = gutter;
+            const { dir, pos } = gutter;
             
-            // [v5] bounds（この線が属するコマ）を基準に、他の線との交差を計算して描画範囲を決定
-            let clipX = bounds.x, clipY = bounds.y, clipW = bounds.w, clipH = bounds.h;
+            // [v6] 描画のたびに、このガターの正しい描画範囲を計算
+            const endpoints = calculateGutterEndpoints(page, gutter);
+            const { clipMin, clipMax } = endpoints;
 
-            page.gutters.forEach(otherGutter => {
-                if (gutter === otherGutter) return;
-                
-                // otherGutterがbounds内にあるか簡易チェック
-                const intersects = !(otherGutter.bounds.x > bounds.x + bounds.w ||
-                                     otherGutter.bounds.x + otherGutter.bounds.w < bounds.x ||
-                                     otherGutter.bounds.y > bounds.y + bounds.h ||
-                                     otherGutter.bounds.y + otherGutter.bounds.h < bounds.y);
-                if (!intersects) return;
-
-                // 自分の向きと「違う」向きの線で、描画範囲を狭める
-                if (dir === 'h' && otherGutter.dir === 'v') {
-                    // 水平線は、交差する「垂直線」によって分断される
-                    if (otherGutter.pos > clipX && otherGutter.pos < clipX + clipW) {
-                         // TODO: このロジックは不完全。
-                         // 本来は「この水平線」が「どの垂直線にぶつかるか」を双方向で計算する必要があり、
-                         // findPanels() (コマ矩形特定) のロジックが必須。
-                         // 現状は、v4の「boundsの範囲で描画」ロジックに戻す。
-                    }
-                }
-                if (dir === 'v' && otherGutter.dir === 'h') {
-                    // 垂直線は、交差する「水平線」によって分断される
-                }
-            });
-            
-            // [v5修正] v4のロジックに戻す（コマ延長は別途findPanelsで対応）
-            clipX = Math.max(fx, bounds.x);
-            clipY = Math.max(fy, bounds.y);
-            clipW = Math.min(fx + fw, bounds.x + bounds.w) - clipX;
-            clipH = Math.min(fy + fh, bounds.y + bounds.h) - clipY;
-
-
-            if (clipW <= 0 || clipH <= 0) return;
+            if (clipMin >= clipMax) return; // 描画範囲がない
 
             if (isExport) {
                 // 書き出し時
@@ -339,19 +322,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const halfGutter = gutterWidth / 2;
                 context.fillStyle = 'white';
                 if (dir === 'h') {
-                    context.fillRect(clipX, pos - halfGutter, clipW, gutterWidth);
+                    context.fillRect(clipMin, pos - halfGutter, clipMax - clipMin, gutterWidth);
                 } else {
-                    context.fillRect(pos - halfGutter, clipY, gutterWidth, clipH);
+                    context.fillRect(pos - halfGutter, clipMin, gutterWidth, clipMax - clipMin);
                 }
                 context.strokeStyle = 'black';
                 context.lineWidth = 1;
                 context.beginPath();
                 if (dir === 'h') {
-                    context.moveTo(clipX, pos - halfGutter); context.lineTo(clipX + clipW, pos - halfGutter);
-                    context.moveTo(clipX, pos + halfGutter); context.lineTo(clipX + clipW, pos + halfGutter);
+                    context.moveTo(clipMin, pos - halfGutter); context.lineTo(clipMax, pos - halfGutter);
+                    context.moveTo(clipMin, pos + halfGutter); context.lineTo(clipMax, pos + halfGutter);
                 } else {
-                    context.moveTo(pos - halfGutter, clipY); context.lineTo(pos - halfGutter, clipY + clipH);
-                    context.moveTo(pos + halfGutter, clipY); context.lineTo(pos + halfGutter, clipY + clipH);
+                    context.moveTo(pos - halfGutter, clipMin); context.lineTo(pos - halfGutter, clipMax);
+                    context.moveTo(pos + halfGutter, clipMin); context.lineTo(pos + halfGutter, clipMax);
                 }
                 context.stroke();
             } else {
@@ -361,41 +344,117 @@ document.addEventListener('DOMContentLoaded', () => {
                 context.setLineDash([]); 
                 context.beginPath();
                 if (dir === 'h') {
-                    context.moveTo(clipX, pos);
-                    context.lineTo(clipX + clipW, pos);
+                    context.moveTo(clipMin, pos);
+                    context.lineTo(clipMax, pos);
                 } else {
-                    context.moveTo(pos, clipY);
-                    context.lineTo(pos, clipY + clipH);
+                    context.moveTo(pos, clipMin);
+                    context.lineTo(pos, clipMax);
                 }
                 context.stroke();
             }
         });
     }
 
-    // [v5修正] ドラッグ中の線も同様の（不完全な）ロジック
+    // [v6新設] ガターの描画範囲（始点・終点）を動的に計算する
+    function calculateGutterEndpoints(page, gutter) {
+        const { dir, pos, bounds } = gutter; // boundsは作成時のコマ
+        const { x: fx, y: fy, w: fw, h: fh } = page.frame;
+        
+        let clipMin, clipMax;
+        
+        if (dir === 'h') {
+            // 水平線 (Yがpos) の、Xの描画範囲 [clipMin, clipMax] を探す
+            clipMin = fx;
+            clipMax = fx + fw;
+            
+            // 1. 作成時のコマ(bounds)でクリップ
+            clipMin = Math.max(clipMin, bounds.x);
+            clipMax = Math.min(clipMax, bounds.x + bounds.w);
+            
+            // 2. ページ内の全「垂直」ガターをチェック
+            page.gutters.forEach(g => {
+                if (g.dir === 'v') {
+                    // 垂直ガター g が、この水平線 gutter と交差するか？
+                    const crossesY = (pos >= g.bounds.y && pos <= g.bounds.y + g.bounds.h);
+                    if (crossesY) {
+                        if (g.pos > clipMin && g.pos < pos) {
+                            // TODO: このロジックはまだ不完全（交差判定がbounds依存）
+                        }
+                    }
+                }
+            });
+            // [v6] コマ延長ロジック（簡易版）：
+            // boundsを無視し、ページ全体で交差する線を探す
+            clipMin = fx;
+            clipMax = fx + fw;
+            page.gutters.forEach(g => {
+                if (g.dir === 'v') { // 水平線なので、垂直線を探す
+                    // gがこの水平線(pos)と交差するか？ (gのY範囲にposがあるか)
+                    if (pos >= g.bounds.y && pos <= g.bounds.y + g.bounds.h) {
+                        if (g.pos > clipMin && g.pos <= bounds.x + bounds.w) { // 左の境界
+                            clipMin = Math.max(clipMin, g.pos + GUTTER_V / 2);
+                        }
+                        if (g.pos < clipMax && g.pos >= bounds.x) { // 右の境界
+                            clipMax = Math.min(clipMax, g.pos - GUTTER_V / 2);
+                        }
+                    }
+                }
+            });
+            // boundsで最終クリップ
+            clipMin = Math.max(clipMin, bounds.x);
+            clipMax = Math.min(clipMax, bounds.x + bounds.w);
+
+        } else {
+            // 垂直線 (Xがpos) の、Yの描画範囲 [clipMin, clipMax] を探す
+            clipMin = fy;
+            clipMax = fy + fh;
+            page.gutters.forEach(g => {
+                if (g.dir === 'h') { // 垂直線なので、水平線を探す
+                    if (pos >= g.bounds.x && pos <= g.bounds.x + g.bounds.w) {
+                        if (g.pos > clipMin && g.pos <= bounds.y + bounds.h) { // 上の境界
+                            clipMin = Math.max(clipMin, g.pos + GUTTER_H / 2);
+                        }
+                        if (g.pos < clipMax && g.pos >= bounds.y) { // 下の境界
+                            clipMax = Math.min(clipMax, g.pos - GUTTER_H / 2);
+                        }
+                    }
+                }
+            });
+            clipMin = Math.max(clipMin, bounds.y);
+            clipMax = Math.min(clipMax, bounds.y + bounds.h);
+        }
+        
+        return { clipMin, clipMax };
+    }
+
+
+    // [v6修正] ドラッグ中の線も同様のロジックで描画
     function drawDragKomaLine(context, x1, y1, x2, y2) {
         const page = getCurrentPage();
         if (!page || !page.frame) return;
         
         const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
-        const komaBounds = findKomaAt(page, x1, y1);
         
-        // [v5] 本来はここでも他のガターを考慮すべきだが、v4ロジックで描画
-        const clipX = komaBounds.x;
-        const clipY = komaBounds.y;
-        const clipW = komaBounds.w;
-        const clipH = komaBounds.h;
+        // [v6] 仮のガターオブジェクトを作成して、描画範囲を計算させる
+        const tempGutter = {
+            dir,
+            pos,
+            bounds: findKomaAt(page, x1, y1) // 基準点のコマ
+        };
+        const { clipMin, clipMax } = calculateGutterEndpoints(page, tempGutter);
+
+        if (clipMin >= clipMax) return;
 
         context.strokeStyle = '#007bff'; 
         context.lineWidth = 1;
         context.setLineDash([]); 
         context.beginPath();
         if (dir === 'h') {
-            context.moveTo(clipX, pos);
-            context.lineTo(clipX + clipW, pos);
+            context.moveTo(clipMin, pos);
+            context.lineTo(clipMax, pos);
         } else {
-            context.moveTo(pos, clipY);
-            context.lineTo(pos, clipY + clipH);
+            context.moveTo(pos, clipMin);
+            context.lineTo(pos, clipMax);
         }
         context.stroke();
     }
@@ -410,14 +469,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // [v5修正] フキダシ描画 (右上アンカー)
+    // [v6修正] フキダシ描画 (右上アンカー)
     function drawSingleBubble(bubble, context) {
         const { x, y, w, h, shape, text, font } = bubble;
         
         context.save();
-        context.translate(x, y); // [v5] (x, y) は「右上」
+        context.translate(x, y); // [v6] (x, y) は「右上」
 
-        // 1. フキダシの形状
         context.fillStyle = 'white';
         context.strokeStyle = 'black';
         context.lineWidth = 2;
@@ -425,12 +483,10 @@ document.addEventListener('DOMContentLoaded', () => {
         context.beginPath();
         switch (shape) {
             case 'rect':
-                // [v5] (0, 0) を右上として描画
                 context.rect(-w, 0, w, h);
                 break;
             case 'ellipse':
             default:
-                // [v5] (0, 0) が右上になるよう、中心をずらす
                 context.ellipse(-w / 2, h / 2, w / 2, h / 2, 0, 0, 2 * Math.PI);
                 break;
         }
@@ -438,17 +494,14 @@ document.addEventListener('DOMContentLoaded', () => {
         context.fill();
         context.stroke();
 
-        // 2. テキスト描画 (縦書き)
+        // テキスト描画 (縦書き)
         context.fillStyle = 'black';
         context.font = `${font}px 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif`;
         context.textAlign = 'center'; 
         context.textBaseline = 'top';
-
         const lines = text.split('\n');
         const columnWidth = font * BUBBLE_LINE_HEIGHT; 
         const charHeight = font * BUBBLE_LINE_HEIGHT;  
-
-        // [v5] 右上 (0,0) を基準に描画開始位置を計算
         let currentX = -BUBBLE_PADDING_X - (columnWidth / 2);
         const startY = BUBBLE_PADDING_Y;
 
@@ -465,13 +518,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function drawSelection(page, context) {
-        // [v5] フキダシ選択 (右上アンカー)
+        // [v6] フキダシ選択 (右上アンカー)
         const bubble = getSelectedBubble(page);
         if (bubble && bubbleEditor.style.display !== 'block') {
             context.strokeStyle = '#007bff';
             context.lineWidth = 2;
             context.setLineDash([6, 3]);
-            // [v5] (x, y) は右上
             context.strokeRect(
                 bubble.x - bubble.w - 2, 
                 bubble.y - 2, 
@@ -481,27 +533,24 @@ document.addEventListener('DOMContentLoaded', () => {
             context.setLineDash([]);
         }
         
-        // コマ枠選択 (v4から変更なし)
+        // [v6] コマ枠選択 (延長ロジック適用)
         const gutter = getSelectedGutter(page);
         if(gutter && page.frame) { 
-            const { dir, pos, bounds } = gutter;
+            const { dir, pos } = gutter;
+            const { clipMin, clipMax } = calculateGutterEndpoints(page, gutter);
+
+            if (clipMin >= clipMax) return;
+            
             context.strokeStyle = '#007bff'; 
             context.lineWidth = 4; 
             context.setLineDash([6, 3]);
             context.beginPath();
-            
-            // [v5] v4のロジック（不完全）
-            const clipX = Math.max(page.frame.x, bounds.x);
-            const clipY = Math.max(page.frame.y, bounds.y);
-            const clipW = Math.min(page.frame.x + page.frame.w, bounds.x + bounds.w) - clipX;
-            const clipH = Math.min(page.frame.y + page.frame.h, bounds.y + bounds.h) - clipY;
-
             if (dir === 'h') {
-                context.moveTo(clipX, pos);
-                context.lineTo(clipX + clipW, pos);
+                context.moveTo(clipMin, pos);
+                context.lineTo(clipMax, pos);
             } else {
-                context.moveTo(pos, clipY);
-                context.lineTo(pos, clipY + clipH);
+                context.moveTo(pos, clipMin);
+                context.lineTo(pos, clipMax);
             }
             context.stroke();
             context.setLineDash([]);
@@ -545,7 +594,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // キャンバス毎のイベントリスナー
     function setupCanvasEventListeners(canvas) {
         canvas.addEventListener('pointerdown', onPointerDown);
-        // [v5] passive: false は不要（touch-actionで制御）
         canvas.addEventListener('pointermove', onPointerMove);
         canvas.addEventListener('pointerup', onPointerUp);
         canvas.addEventListener('pointercancel', onPointerUp); 
@@ -558,7 +606,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             state.currentTool = toolName;
         }
-        
         clearSelection();
         updateUI();
         renderActivePage();
@@ -584,7 +631,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const newSize = parseInt(e.target.value, 10);
         state.defaultFontSize = newSize;
         fontSizeValue.textContent = `${newSize}px`;
-
         const selectedBubble = getSelectedBubble();
         if (selectedBubble) {
             selectedBubble.font = newSize;
@@ -646,10 +692,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (clickedBubble) {
                 state.selectedBubbleId = clickedBubble.id;
                 isDraggingBubble = true;
-                // [v5] 「右上アンカー」とのオフセットを計算
                 dragBubbleOffsetX = clickedBubble.x - x;
                 dragBubbleOffsetY = clickedBubble.y - y;
-                // [v5] ドラッグ開始時にスクロールを無効化
+                // [v6] ドラッグ開始時にスクロールを無効化
                 e.target.classList.add('dragging');
             }
         }
@@ -659,7 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function onPointerMove(e) {
-        // [v5] ドラッグ中はスクロールを止める (touch-action が効かない場合のための保険)
+        // [v6] ドラッグ中はスクロールを止める (touch-action が効かない場合のための保険)
         if (isDragging || isDraggingBubble) {
             e.preventDefault();
         }
@@ -675,7 +720,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (isDraggingBubble && state.currentTool === null) {
             const bubble = getSelectedBubble();
             if (bubble) {
-                // [v5] 「右上アンカー」を更新
                 bubble.x = x + dragBubbleOffsetX;
                 bubble.y = y + dragBubbleOffsetY;
                 
@@ -695,7 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveAndRenderActivePage();
         } else if (isDraggingBubble) {
             isDraggingBubble = false;
-            // [v5] ドラッグ終了時にスクロールを有効化
+            // [v6] ドラッグ終了時にスクロールを有効化
             e.target.classList.remove('dragging');
             if (bubbleEditor.style.display !== 'block') {
                  saveAndRenderActivePage();
@@ -706,25 +750,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- キーボードイベント ---
     function onKeyDown(e) {
         const keyCode = e.code; 
-
         if (keyCode === 'Escape') {
-            if (bubbleEditor.style.display === 'block') {
-                bubbleEditor.blur(); 
-            } else {
+            if (bubbleEditor.style.display === 'block') bubbleEditor.blur(); 
+            else {
                 clearSelection();
                 updateUI();
                 renderActivePage();
             }
         }
-        
         if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
-
-        if (keyCode === 'KeyS' && !e.metaKey && !e.ctrlKey) {
-            e.preventDefault(); setTool('serif');
-        }
-        if (keyCode === 'KeyK' && !e.metaKey && !e.ctrlKey) {
-            e.preventDefault(); setTool('koma');
-        }
+        if (keyCode === 'KeyS' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setTool('serif'); }
+        if (keyCode === 'KeyK' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setTool('koma'); }
     }
 
     // --- ページ管理ロジック ---
@@ -734,12 +770,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createNewPage() {
         const id = `page_${Date.now()}`;
-        const page = {
-            id: id,
-            frame: null, 
-            gutters: [],
-            bubbles: []
-        };
+        const page = { id: id, frame: null, gutters: [], bubbles: [] };
         const cssWidth = pageElements.length > 0 ? pageElements[0].canvas.clientWidth : 300; 
         const cssHeight = cssWidth * B5_ASPECT_RATIO;
         page.frame = { 
@@ -767,7 +798,6 @@ document.addEventListener('DOMContentLoaded', () => {
             saveAndRenderActivePage();
             return;
         }
-        
         const deleteIndex = state.currentPageIndex;
         pageElements[deleteIndex].wrapper.remove();
         pageElements.splice(deleteIndex, 1);
@@ -783,6 +813,7 @@ document.addEventListener('DOMContentLoaded', () => {
             el.wrapper.dataset.pageIndex = index;
             el.canvas.dataset.pageIndex = index;
         });
+        updatePageIndicator(); // [v6] ページ総数が変わるので更新
     }
 
     function resetAllData() {
@@ -792,37 +823,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     // --- セリフ (フキダシ) ロジック ---
-    // [v5修正] フキダシ作成 (右上アンカー)
+    // [v6修正] フキダシ作成 (右上アンカー)
     function createBubble(x, y) {
         const page = getCurrentPage();
         if (!page) return null; 
         const bubble = {
             id: `bubble_${Date.now()}`,
-            x: x, y: y, // [v5] (x, y) は「右上」
+            x: x, y: y, // [v6] (x, y) は「右上」
             w: 100, h: 50, 
             text: "セリフ",
             shape: 'ellipse',
             font: state.defaultFontSize
         };
-        measureBubbleSize(bubble); // サイズ計算
+        measureBubbleSize(bubble); 
         page.bubbles.push(bubble);
         return bubble;
     }
 
-    // [v5修正] フキダシ当たり判定 (右上アンカー)
+    // [v6修正] フキダシ当たり判定 (右上アンカー)
     function findBubbleAt(page, x, y) {
         if (!page) return null;
         for (let i = page.bubbles.length - 1; i >= 0; i--) {
             const b = page.bubbles[i];
-            // [v5] (b.x, b.y) は「右上」
-            if (
-                x >= b.x - b.w && // 左端
-                x <= b.x &&       // 右端
-                y >= b.y &&       // 上端
-                y <= b.y + b.h    // 下端
-            ) {
+            if (x >= b.x - b.w && x <= b.x && y >= b.y && y <= b.y + b.h) {
                 return b;
             }
         }
@@ -832,30 +856,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function showBubbleEditor(bubble) {
         hideBubbleEditor(); 
         state.selectedBubbleId = bubble.id;
-        
         bubbleEditor.value = bubble.text;
         bubbleEditor.style.display = 'block';
         bubbleEditor.style.fontSize = `${bubble.font}px`;
         bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
-        
         updateBubbleEditorPosition(bubble);
         bubbleEditor.focus();
         bubbleEditor.select();
-        
         updateUI();
         renderActivePage();
     }
     
-    // [v5修正] エディタ位置 (右上アンカー)
+    // [v6修正] エディタ位置 (右上アンカー)
     function updateBubbleEditorPosition(bubble) {
         const canvas = pageElements[state.currentPageIndex].canvas;
         const canvasRect = canvas.getBoundingClientRect();
         const containerScrollTop = canvasContainer.scrollTop;
-        
-        // [v5] (bubble.x, bubble.y) は「右上」
         const editorWidth = bubble.w;
         const editorHeight = bubble.h;
-
         bubbleEditor.style.width = `${editorWidth}px`;
         bubbleEditor.style.height = `${editorHeight}px`;
         bubbleEditor.style.left = `${canvasRect.left + bubble.x - editorWidth}px`; // (x - w)
@@ -881,17 +899,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = getSelectedBubble();
         if (bubble) {
             bubble.text = e.target.value;
-            // [v5] サイズ変更してもアンカー (x, y) は不変
             measureBubbleSize(bubble);
             updateBubbleEditorPosition(bubble);
         }
     }
     
-    function onBubbleEditorKeyDown(e) {
-        // Escキーでの終了 (blur) はグローバルのonKeyDownで処理
-    }
+    function onBubbleEditorKeyDown(e) { /* Escはグローバルで処理 */ }
 
-    // 縦書き用のサイズ測定 (v3から変更なし)
+    // 縦書き用のサイズ測定
     function measureBubbleSize(bubble) {
         const { text, font } = bubble;
         const lines = text.split('\n');
@@ -932,41 +947,57 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     // --- コマ割りロジック ---
 
+    // [v6修正] どのコマに属するか（bounds）を再帰的に計算
     function findKomaAt(page, x, y) {
-        if (!page || !page.frame) return { x: 0, y: 0, w: 0, h: 0 };
-        const { x: fx, y: fy, w: fw, h: fh } = page.frame;
-        let bounds = { x: fx, y: fy, w: fw, h: fh }; 
+        let currentBounds = page.frame;
+        if (!currentBounds) return { x: 0, y: 0, w: 0, h: 0 };
+        
+        let foundSplit = true;
+        while(foundSplit) {
+            foundSplit = false;
+            for(const gutter of page.gutters) {
+                const { dir, pos, bounds: gutterBounds } = gutter;
+                
+                // このガターが現在のboundsを分割するか？
+                const intersects = !(gutterBounds.x > currentBounds.x + currentBounds.w ||
+                                   gutterBounds.x + gutterBounds.w < currentBounds.x ||
+                                   gutterBounds.y > currentBounds.y + currentBounds.h ||
+                                   gutterBounds.y + gutterBounds.h < currentBounds.y);
 
-        page.gutters.forEach(gutter => {
-            const { dir, pos, bounds: gutterBounds } = gutter;
-            if (x >= bounds.x && x <= bounds.x + bounds.w && 
-                y >= bounds.y && y <= bounds.y + bounds.h) {
-                const intersects = !(gutterBounds.x > bounds.x + bounds.w || gutterBounds.x + gutterBounds.w < bounds.x || gutterBounds.y > bounds.y + bounds.h || gutterBounds.y + gutterBounds.h < bounds.y);
-                if (!intersects) return;
-                if (dir === 'h' && y >= gutterBounds.y && y <= gutterBounds.y + gutterBounds.h) {
-                    if (y > pos) { 
-                        const newY = pos + GUTTER_H / 2; bounds.h = (bounds.y + bounds.h) - newY; bounds.y = newY;
-                    } else { 
-                        bounds.h = (pos - GUTTER_H / 2) - bounds.y;
-                    }
-                } else if (dir === 'v' && x >= gutterBounds.x && x <= gutterBounds.x + gutterBounds.w) {
-                    if (x > pos) { 
-                        const newX = pos + GUTTER_V / 2; bounds.w = (bounds.x + bounds.w) - newX; bounds.x = newX;
-                    } else { 
-                        bounds.w = (pos - GUTTER_V / 2) - bounds.x;
+                if (intersects) {
+                    if (dir === 'h' && y >= gutterBounds.y && y <= gutterBounds.y + gutterBounds.h) {
+                        if (y > pos && pos > currentBounds.y) { // 下
+                            const newY = pos + GUTTER_H / 2;
+                            currentBounds = { x: currentBounds.x, y: newY, w: currentBounds.w, h: (currentBounds.y + currentBounds.h) - newY };
+                            foundSplit = true;
+                        } else if (y <= pos && pos < currentBounds.y + currentBounds.h) { // 上
+                            currentBounds = { x: currentBounds.x, y: currentBounds.y, w: currentBounds.w, h: (pos - GUTTER_H / 2) - currentBounds.y };
+                            foundSplit = true;
+                        }
+                    } else if (dir === 'v' && x >= gutterBounds.x && x <= gutterBounds.x + gutterBounds.w) {
+                        if (x > pos && pos > currentBounds.x) { // 右
+                            const newX = pos + GUTTER_V / 2;
+                            currentBounds = { x: newX, y: currentBounds.y, w: (currentBounds.x + currentBounds.w) - newX, h: currentBounds.h };
+                            foundSplit = true;
+                        } else if (x <= pos && pos < currentBounds.x + currentBounds.w) { // 左
+                            currentBounds = { x: currentBounds.x, y: currentBounds.y, w: (pos - GUTTER_V / 2) - currentBounds.x, h: currentBounds.h };
+                            foundSplit = true;
+                        }
                     }
                 }
             }
-        });
-        bounds.w = Math.min(bounds.x + bounds.w, fx + fw) - bounds.x;
-        bounds.h = Math.min(bounds.y + bounds.h, fy + fh) - bounds.y;
-        return bounds;
+        }
+        // 最終的なboundsをクリッピング
+        currentBounds.w = Math.min(currentBounds.x + currentBounds.w, page.frame.x + page.frame.w) - currentBounds.x;
+        currentBounds.h = Math.min(currentBounds.y + currentBounds.h, page.frame.y + page.frame.h) - currentBounds.y;
+        
+        return currentBounds;
     }
 
-    // [v5修正] タップ（水平線）判定
+
+    // [v6修正] タップ（水平線）判定
     function getKomaSnapDirection(x1, y1, x2, y2) {
         const dx = x2 - x1;
         const dy = y2 - y1;
@@ -979,7 +1010,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const angle = Math.atan2(dy, dx) * 180 / Math.PI; 
         let dir = null;
         let pos = 0;
-
         if (Math.abs(angle) <= SNAP_ANGLE_THRESHOLD || Math.abs(angle) >= 180 - SNAP_ANGLE_THRESHOLD) {
             dir = 'h'; pos = y1; 
         } else if (Math.abs(angle - 90) <= SNAP_ANGLE_THRESHOLD || Math.abs(angle + 90) <= SNAP_ANGLE_THRESHOLD) {
@@ -995,6 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const page = getCurrentPage();
         if (!page) return;
         const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
+        // [v6] 作成時のboundsを、新しいfindKomaAtで正しく取得
         const komaBounds = findKomaAt(page, x1, y1);
         page.gutters.push({
             id: `gutter_${Date.now()}`, 
@@ -1002,16 +1033,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // [v5修正] 当たり判定を拡大
+    // [v6修正] 当たり判定を拡大
     function findGutterAt(page, x, y) {
         if (!page) return null;
         for (let i = page.gutters.length - 1; i >= 0; i--) {
             const gutter = page.gutters[i];
             const { dir, pos, bounds } = gutter;
-            if (x >= bounds.x && x <= bounds.x + bounds.w &&
-                y >= bounds.y && y <= bounds.y + bounds.h) {
-                if (dir === 'h' && Math.abs(y - pos) < KOMA_HIT_THRESHOLD) return gutter;
-                if (dir === 'v' && Math.abs(x - pos) < KOMA_HIT_THRESHOLD) return gutter;
+            // [v6] boundsを無視し、計算し直した描画範囲で当たり判定
+            const { clipMin, clipMax } = calculateGutterEndpoints(page, gutter);
+            
+            if (dir === 'h' && y >= pos - KOMA_HIT_THRESHOLD && y <= pos + KOMA_HIT_THRESHOLD) {
+                if (x >= clipMin && x <= clipMax) return gutter;
+            }
+            if (dir === 'v' && x >= pos - KOMA_HIT_THRESHOLD && x <= pos + KOMA_HIT_THRESHOLD) {
+                if (y >= clipMin && y <= clipMax) return gutter;
             }
         }
         return null;
@@ -1032,34 +1067,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- [v5新設] テキストコピー（コマ順ソート） ---
+    // --- [v6新設] テキストコピー（コマ順ソート） ---
     
     // ページから全コマの矩形を計算する
     function findPanels(page) {
         if (!page.frame) return [];
-        
         let panels = [page.frame]; // スタートはページ全体
         
-        // 縦横のガターでリストを分ける
-        const vGutters = page.gutters.filter(g => g.dir === 'v').sort((a, b) => a.pos - b.pos);
-        const hGutters = page.gutters.filter(g => g.dir === 'h').sort((a, b) => a.pos - b.pos);
+        // ガターで再帰的にコマを分割
+        function splitPanel(panel, gutters) {
+            for (const gutter of gutters) {
+                const { dir, pos } = gutter;
+                
+                // ガターがパネルを分割するか？
+                if (dir === 'h' && pos > panel.y && pos < panel.y + panel.h) {
+                    // 水平分割
+                    const p1 = { x: panel.x, y: panel.y, w: panel.w, h: (pos - GUTTER_H / 2) - panel.y };
+                    const p2 = { x: panel.x, y: pos + GUTTER_H / 2, w: panel.w, h: (panel.y + panel.h) - (pos + GUTTER_H / 2) };
+                    return [...splitPanel(p1, gutters), ...splitPanel(p2, gutters)];
+                }
+                if (dir === 'v' && pos > panel.x && pos < panel.x + panel.w) {
+                    // 垂直分割
+                    const p1 = { x: panel.x, y: panel.y, w: (pos - GUTTER_V / 2) - panel.x, h: panel.h };
+                    const p2 = { x: pos + GUTTER_V / 2, y: panel.y, w: (panel.x + panel.w) - (pos + GUTTER_V / 2), h: panel.h };
+                    return [...splitPanel(p1, gutters), ...splitPanel(p2, gutters)];
+                }
+            }
+            return [panel]; // 分割するガターがなかった
+        }
 
-        // ガターで再帰的にコマを分割していく
-        // (簡易版：ガターがどのコマに属するか(bounds)を見て分割)
-        // (注：これはv5のコマ延長描画ロジックが未実装のため、不完全なコマ順になります)
-        
-        let finalPanels = [];
-        
-        // 簡易ロジック: v3/v4 の findKomaAt を逆利用して、
-        // ページをグリッド状にサンプリングし、ユニークなコマ矩形を集める
-        // (これはパフォーマンスが悪いが、正確なコマ分割ロジックより実装が容易)
-        
+        // 簡易版：v5のfindKomaAt(sampling)ベース
         const knownBounds = new Set();
+        let finalPanels = [];
         const { x: fx, y: fy, w: fw, h: fh } = page.frame;
-        
-        // ページ内をサンプリング
-        for(let y = fy + 1; y < fy + fh; y += 10) {
-            for(let x = fx + 1; x < fx + fw; x += 10) {
+        for(let y = fy + 1; y < fy + fh; y += (fh / 10)) {
+            for(let x = fx + 1; x < fx + fw; x += (fw / 10)) {
                 const bounds = findKomaAt(page, x, y);
                 const key = `${bounds.x},${bounds.y},${bounds.w},${bounds.h}`;
                 if (!knownBounds.has(key)) {
@@ -1068,10 +1110,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-        
+
         // コマを漫画の読み順（上→下、右→左）でソート
         finalPanels.sort((a, b) => {
-            if (Math.abs(a.y - b.y) < 10) { // ほぼ同じ高さ
+            if (Math.abs(a.y - b.y) < 10) { 
                 return b.x - a.x; // 右 (X大) が先
             }
             return a.y - b.y; // 上 (Y小) が先
@@ -1080,10 +1122,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return finalPanels;
     }
     
-    // コマ内のフキダシをソート（右→上）
+    // [v6] コマ内のフキダシをソート（右優先→上優先）
     function sortBubblesInPanel(bubbles) {
         return bubbles.sort((a, b) => {
-            if (Math.abs(a.x - b.x) < 10) { // ほぼ同じX（右）
+            // [v6] 座標は右上アンカー (b.x, b.y)
+            if (Math.abs(a.x - b.x) < 10) { // ほぼ同じX
                 return a.y - b.y; // 上 (Y小) が先
             }
             return b.x - a.x; // 右 (X大) が先
@@ -1093,46 +1136,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function exportText() {
         let output = "";
         state.pages.forEach((page, pageIndex) => {
-            
-            // 1. ページ内の全コマを読み順で取得
             const panels = findPanels(page);
-            
-            // 2. 全フキダシをコピー（仕分け用）
             let bubbles = [...page.bubbles];
             
-            // 3. コマ順に処理
             panels.forEach((panel) => {
                 let bubblesInPanel = [];
-                
-                // 4. フキダシをコマに割り当て
-                // (右上アンカー (b.x, b.y) がコマ内にあるか)
                 bubbles = bubbles.filter(b => {
+                    // [v6] 右上アンカー (b.x, b.y) がコマ内か
                     if (b.x > panel.x && b.x <= panel.x + panel.w &&
-                        b.y > panel.y && b.y <= panel.y + panel.h) {
+                        b.y >= panel.y && b.y < panel.y + panel.h) {
                         bubblesInPanel.push(b);
-                        return false; // 仕分け済みなのでリストから削除
+                        return false; 
                     }
                     return true;
                 });
                 
-                // 5. コマ内のフキダシをソート（右→上）
                 sortBubblesInPanel(bubblesInPanel);
                 
-                // 6. テキスト出力
-                bubblesInPanel.forEach((bubble, bubbleIndex) => {
+                bubblesInPanel.forEach((bubble) => {
                     output += bubble.text;
-                    output += "\n\n"; // フキダシ間は空行1
+                    output += "\n\n"; 
                 });
             });
-            
-            // (コマに割り当てられなかったフキダシは無視)
-
             if (pageIndex < state.pages.length - 1) {
-                output += "\n\n"; // ページ間は空行 (合計3改行)
+                output += "\n\n"; 
             }
         });
         
-        textIO.value = output.trim(); // 最後の余分な改行を削除
+        textIO.value = output.trim(); 
         textIO.style.display = 'block';
         textIO.select();
         try {
@@ -1148,7 +1179,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function importText() {
         const text = prompt('テキストをペーストしてください（現在のページ以降が上書きされます）');
         if (text === null) return; 
-
         const pagesData = parseTextImport(text);
         if (pagesData.length === 0) return;
 
@@ -1167,14 +1197,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const frame = page.frame || { x: PAGE_FRAME_PADDING, y: PAGE_FRAME_PADDING, w: 200, h: 280 };
             const { w: fw, h: fh } = frame;
-            // [v5] 右上アンカーで配置
             const startX = frame.x + fw - 30; // 右から
             const startY = frame.y + 30; // 上から
             let currentX = startX, currentY = startY;
 
-            pageContent.bubbles.forEach((text, bubbleIndex) => {
+            pageContent.bubbles.forEach((text) => {
                 const bubble = {
-                    id: `bubble_import_${Date.now()}_${i}_${bubbleIndex}`,
+                    id: `bubble_import_${Date.now()}`,
                     x: currentX, y: currentY, // 右上アンカー
                     w: 0, h: 0, 
                     text: text, shape: 'ellipse', font: state.defaultFontSize
@@ -1183,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 page.bubbles.push(bubble);
                 
                 currentY += bubble.h + 20; // 次は下へ
-                if (currentY > frame.y + fh - bubble.h) {
+                if (currentY > frame.y + fh - 50) { // 50pxは最低マージン
                     currentY = startY;
                     currentX -= 120; // 次の列（左）へ
                 }
@@ -1233,19 +1262,48 @@ document.addEventListener('DOMContentLoaded', () => {
         return offCanvas;
     }
 
-    function exportPNG() {
+    // [v6修正] PNG書き出し (Web Share API)
+    async function exportPNG() {
         const page = getCurrentPage();
         if (!page) return;
+        
         const offCanvas = renderPageToCanvas(page, state.dpr); 
-        offCanvas.toBlob(blob => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `page_${state.currentPageIndex + 1}.png`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }, 'image/png');
+        const blob = await new Promise(resolve => offCanvas.toBlob(resolve, 'image/png'));
+        const fileName = `page_${state.currentPageIndex + 1}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+
+        // Web Share API (スマホの「共有」機能) を試す
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    title: 'Manga Page',
+                    text: `Page ${state.currentPageIndex + 1}`,
+                    files: [file],
+                });
+                // 共有が成功（「画像を保存」などが選ばれた）
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Share failed:', err);
+                    // 共有が失敗したらフォールバック
+                    downloadFallback(blob, fileName);
+                }
+            }
+        } else {
+            // 共有APIが使えない（PCなど）場合は、従来のダウンロード
+            downloadFallback(blob, fileName);
+        }
     }
+    
+    // [v6新設] ダウンロードのフォールバック
+    function downloadFallback(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
 
     async function exportZIP() {
         if (typeof JSZip === 'undefined') {
@@ -1264,7 +1322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const url = URL.createObjectURL(content);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'manganame_v5.zip';
+                a.download = 'manganame_v6.zip';
                 a.click();
                 URL.revokeObjectURL(url);
             });

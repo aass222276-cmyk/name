@@ -1,6 +1,6 @@
 // Service Worker (sw.js)
 
-const SW_VERSION = 'manganame-v3.0.0'; // 変更を反映させたい時にここを変更
+const SW_VERSION = 'manganame-v6.0.0'; // [v6] このバージョン番号の更新が必須です
 const CACHE_NAME = `manganame-cache-${SW_VERSION}`;
 
 // キャッシュする主要アセット
@@ -12,7 +12,7 @@ const urlsToCache = [
     './manifest.webmanifest',
     './icons/icon-192.png',
     './icons/icon-512.png'
-    // JSZipはCDNからなのでキャッシュ対象外 (オンライン前提)
+    // JSZipはCDNからなのでキャッシュ対象外
 ];
 
 // 1. インストール
@@ -35,6 +35,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
+                    // [v6] v5以前のキャッシュをすべて削除
                     if (cacheName !== CACHE_NAME && cacheName.startsWith('manganame-cache-')) {
                         console.log('Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
@@ -49,6 +50,12 @@ self.addEventListener('activate', (event) => {
 
 // 3. フェッチ (キャッシュ優先、なければネットワーク)
 self.addEventListener('fetch', (event) => {
+    // CDNのリクエスト（JSZipなど）はキャッシュしない
+    if (event.request.url.startsWith('http') && !event.request.url.startsWith(self.location.origin)) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
         caches.match(event.request)
             .then((response) => {
