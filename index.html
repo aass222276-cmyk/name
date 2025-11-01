@@ -13,8 +13,8 @@
 <body>
 
     <div id="toolbar">
-        <button id="btnSerif" class="tool-toggle" title="セリフ (S)">S</button>
-        <button id="btnKoma" class="tool-toggle" title="コマ枠 (K)">K</button>
+        <button id="btnSerif" class="tool-toggle" title="セリフ (S)">セリフ</button>
+        <button id="btnKoma" class="tool-toggle" title="コマ枠 (K)">コマ</button>
         
         <div class="separator"></div>
 
@@ -44,12 +44,17 @@
         <textarea id="bubbleEditor"></textarea>
     </div>
 
-    <div id="selectionPanel">
+    <div id="selectionPanelBubble">
         <button id="shapeEllipse">楕円</button>
         <button id="shapeRect">四角</button>
         <button id="shapeSaw">ギザ</button>
         <button id="deleteBubble">削除</button>
     </div>
+    
+    <div id="selectionPanelGutter">
+        <button id="deleteGutter">コマ枠 削除</button>
+    </div>
+
 
     <div id="pagestrip">
         </div>

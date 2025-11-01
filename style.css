@@ -6,8 +6,9 @@
     --panel-height: 40px;
     --gutter-h: 18px; /* 横ガター幅 */
     --gutter-v: 9px;  /* 縦ガター幅 */
-    --padding-bubble-x: 10px;
-    --padding-bubble-y: 8px;
+    /* 縦書き用パディング (Top/Bottomが左右、Left/Rightが上下になる) */
+    --padding-bubble-x: 10px; /* 左右の余白 */
+    --padding-bubble-y: 8px;  /* 上下の余白 */
 }
 
 body, html {
@@ -25,7 +26,7 @@ body, html {
     flex-direction: column;
 }
 
-/* --- ツールバー --- */
+/* --- ツールバー (横スクロール対応) --- */
 #toolbar {
     display: flex;
     align-items: center;
@@ -34,7 +35,25 @@ body, html {
     padding: 0 10px;
     gap: 8px;
     flex-shrink: 0;
+    /* [修正] スマホで溢れた場合、横スクロールできるように */
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* スクロールバーのデザイン (簡易) */
+    scrollbar-width: thin;
+    scrollbar-color: #888 #444;
 }
+/* [追加] スクロールバー (webkit) */
+#toolbar::-webkit-scrollbar {
+    height: 6px;
+}
+#toolbar::-webkit-scrollbar-track {
+    background: #444;
+}
+#toolbar::-webkit-scrollbar-thumb {
+    background-color: #888;
+    border-radius: 3px;
+}
+
 #toolbar button {
     background: #666;
     border: 1px solid #888;
@@ -43,6 +62,10 @@ body, html {
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
+    /* [追加] ボタンが縮まないように */
+    flex-shrink: 0;
+    /* [追加] ボタンテキストが改行しないように */
+    white-space: nowrap;
 }
 #toolbar button:hover {
     background: #777;
@@ -56,17 +79,21 @@ body, html {
     height: 24px;
     background-color: #555;
     margin: 0 4px;
+    flex-shrink: 0;
 }
 #toolbar label {
     font-weight: bold;
+    flex-shrink: 0;
 }
 #sliderFontSize {
     width: 100px;
+    flex-shrink: 0;
 }
 #fontSizeValue {
     width: 40px;
     text-align: right;
     font-size: 0.9em;
+    flex-shrink: 0;
 }
 
 /* --- キャンバス領域 --- */
@@ -84,33 +111,54 @@ body, html {
 
 #mainCanvas {
     background: white;
-    /* 比率はJSで制御するが、念のため設定 */
     aspect-ratio: calc(1 / var(--b5-ratio)); 
     max-width: 100%;
     max-height: 100%;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    cursor: default; /* デフォルトはポインタ */
+}
+#mainCanvas.tool-serif {
+    cursor: text;
+}
+#mainCanvas.tool-koma {
     cursor: crosshair;
 }
 
-/* --- フキダシ入力エリア --- */
+
+/* --- フキダシ入力エリア (縦書き) --- */
 #bubbleEditor {
     position: absolute;
     display: none;
     background: rgba(255, 255, 255, 0.95);
     border: 1px dashed #007bff;
-    padding: var(--padding-bubble-y) var(--padding-bubble-x);
     box-sizing: border-box;
-    overflow: hidden;
-    white-space: pre; /* 改行のみを反映 */
+    overflow: hidden; /* 縦書きのため overflow-y は JS で制御 */
     resize: none;
     outline: none;
-    font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; /* 漫画風フォント（あれば） */
-    line-height: 1.2;
+    font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
     z-index: 10;
+    
+    /* [修正] 縦書き設定 */
+    writing-mode: vertical-rl;
+    white-space: pre; /* 改行のみを反映 */
+    padding: var(--padding-bubble-y) var(--padding-bubble-x);
+    /* 縦書きの場合、line-heightは横幅の制御になる */
+    line-height: 1.2; 
+    
+    /* 縦書きtextareaのスクロールバー (簡易) */
+    overflow-y: auto; /* 縦（横方向）スクロール */
+    scrollbar-width: thin;
+    scrollbar-color: #888 #ccc;
+}
+#bubbleEditor::-webkit-scrollbar {
+    height: 6px;
+}
+#bubbleEditor::-webkit-scrollbar-thumb {
+    background-color: #888;
 }
 
-/* --- 選択パネル --- */
-#selectionPanel {
+/* --- 選択パネル (共通スタイル) --- */
+.selection-panel {
     position: absolute;
     bottom: calc(var(--pagestrip-height) + 10px);
     left: 50%;
@@ -123,10 +171,10 @@ body, html {
     gap: 5px;
     z-index: 20;
 }
-#selectionPanel.show {
+.selection-panel.show {
     display: flex;
 }
-#selectionPanel button {
+.selection-panel button {
     background: #666;
     border: 1px solid #888;
     color: white;
@@ -134,18 +182,18 @@ body, html {
     border-radius: 4px;
     cursor: pointer;
 }
-#selectionPanel button:hover {
+.selection-panel button:hover {
     background: #777;
 }
-#selectionPanel #deleteBubble {
+/* 削除ボタン */
+.selection-panel button.delete {
     background: #c00;
 }
-#selectionPanel #deleteBubble:hover {
+.selection-panel button.delete:hover {
     background: #e00;
 }
 
-
-/* --- ページストリップ --- */
+/* --- ページストリップ (変更なし) --- */
 #pagestrip {
     height: var(--pagestrip-height);
     background-color: #222;
