@@ -1,0 +1,197 @@
+/* --- 基本設定 --- */
+:root {
+    --b5-ratio: 1.4142; /* B5縦 (√2) */
+    --toolbar-height: 44px;
+    --pagestrip-height: 60px;
+    --panel-height: 40px;
+    --gutter-h: 18px; /* 横ガター幅 */
+    --gutter-v: 9px;  /* 縦ガター幅 */
+    --padding-bubble-x: 10px;
+    --padding-bubble-y: 8px;
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #333;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- ツールバー --- */
+#toolbar {
+    display: flex;
+    align-items: center;
+    height: var(--toolbar-height);
+    background-color: #444;
+    padding: 0 10px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+#toolbar button {
+    background: #666;
+    border: 1px solid #888;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+#toolbar button:hover {
+    background: #777;
+}
+#toolbar button.active {
+    background: #007bff;
+    border-color: #0056b3;
+}
+#toolbar .separator {
+    width: 1px;
+    height: 24px;
+    background-color: #555;
+    margin: 0 4px;
+}
+#toolbar label {
+    font-weight: bold;
+}
+#sliderFontSize {
+    width: 100px;
+}
+#fontSizeValue {
+    width: 40px;
+    text-align: right;
+    font-size: 0.9em;
+}
+
+/* --- キャンバス領域 --- */
+#canvasContainer {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative; /* テキストエリアの基準 */
+    background-color: #2a2a2a;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+#mainCanvas {
+    background: white;
+    /* 比率はJSで制御するが、念のため設定 */
+    aspect-ratio: calc(1 / var(--b5-ratio)); 
+    max-width: 100%;
+    max-height: 100%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    cursor: crosshair;
+}
+
+/* --- フキダシ入力エリア --- */
+#bubbleEditor {
+    position: absolute;
+    display: none;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px dashed #007bff;
+    padding: var(--padding-bubble-y) var(--padding-bubble-x);
+    box-sizing: border-box;
+    overflow: hidden;
+    white-space: pre; /* 改行のみを反映 */
+    resize: none;
+    outline: none;
+    font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; /* 漫画風フォント（あれば） */
+    line-height: 1.2;
+    z-index: 10;
+}
+
+/* --- 選択パネル --- */
+#selectionPanel {
+    position: absolute;
+    bottom: calc(var(--pagestrip-height) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(50, 50, 50, 0.9);
+    border: 1px solid #888;
+    border-radius: 6px;
+    padding: 5px;
+    display: none; /* JSで表示切替 */
+    gap: 5px;
+    z-index: 20;
+}
+#selectionPanel.show {
+    display: flex;
+}
+#selectionPanel button {
+    background: #666;
+    border: 1px solid #888;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+#selectionPanel button:hover {
+    background: #777;
+}
+#selectionPanel #deleteBubble {
+    background: #c00;
+}
+#selectionPanel #deleteBubble:hover {
+    background: #e00;
+}
+
+
+/* --- ページストリップ --- */
+#pagestrip {
+    height: var(--pagestrip-height);
+    background-color: #222;
+    border-top: 1px solid #555;
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 5px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.page-thumbnail {
+    height: calc(var(--pagestrip-height) - 12px); /* padding考慮 */
+    aspect-ratio: calc(1 / var(--b5-ratio));
+    background-color: white;
+    border: 2px solid #888;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+.page-thumbnail.active {
+    border-color: #007bff;
+    border-width: 3px;
+    box-shadow: 0 0 8px #007bff;
+}
+.page-thumbnail canvas {
+    width: 100%;
+    height: 100%;
+}
+.page-thumbnail .page-number {
+    position: absolute;
+    bottom: 0;
+    right: 2px;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #000;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 0 2px;
+}
+
+/* 非表示のテキストエリア */
+#textIO {
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    opacity: 0;
+}
