@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- 定数 (v8) ---
-    const STORAGE_KEY = 'manganame-v8'; // [v8]
+    // --- 定数 (v9) ---
+    const STORAGE_KEY = 'manganame-v9'; // [v9]
     const B5_ASPECT_RATIO = Math.sqrt(2); 
     const PAGE_FRAME_PADDING = 15; 
     const GUTTER_H = 18; 
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPasteText = document.getElementById('btnPasteText');
     const btnPNG = document.getElementById('btnPNG');
     const btnZIP = document.getElementById('btnZIP');
-    const btnResetPage = document.getElementById('btnResetPage'); // [v8]
+    const btnResetPage = document.getElementById('btnResetPage'); 
     const btnReset = document.getElementById('btnReset'); 
     const selectionPanelBubble = document.getElementById('selectionPanelBubble');
     const shapeEllipse = document.getElementById('shapeEllipse');
@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     let pageElements = []; // { wrapper: div, canvas: canvas, ctx: ctx }
-    let activePointerId = null; // [v8] キャプチャ中のポインターID
+    let activePointerId = null; // [v9] キャプチャ中のポインターID
 
     // ドラッグ状態
     let isDragging = false; // コマ枠用
@@ -250,29 +250,35 @@ document.addEventListener('DOMContentLoaded', () => {
         context.strokeRect(x, y, w, h);
     }
 
-    // [v8修正] コマ枠の描画ロジック (「お手本」の方式＝端から端まで引く)
+    // [v9修正] コマ枠の描画ロジック (「突き抜け」バグの修正)
     function drawKoma(page, context, isExport = false) {
         if (!page.frame) return;
         const { x: fx, y: fy, w: fw, h: fh } = page.frame;
 
         page.gutters.forEach(gutter => {
-            const { dir, pos } = gutter;
+            const { dir, pos, bounds } = gutter;
             
-            // [v8] バグのあった v7 の calculateGutterEndpoints を破棄。
-            // [v8] "お手本"コードの描画ロジック（＝常に外枠まで引く）を採用。
-            // これがスクリーンショットの「線が消える」バグを修正します。
-            const clipMinX = fx;
-            const clipMaxX = fx + fw;
-            const clipMinY = fy;
-            const clipMaxY = fy + fh;
+            // [v9] v8の「突き抜け」バグを修正。
+            // [v9] 線が作られた時のコマの矩形（bounds）の範囲「だけ」で線を描画する。
+            // [v9] v8の「お手本」ロジック（findKomaAt）のおかげで、
+            //      保存される `bounds` が正確になり、v7の「線が消える」バグも起きない。
+            if (!bounds) return; // 安全策
+            
+            // bounds をページ外枠でさらにクリップ
+            const clipMinX = Math.max(fx, bounds.x);
+            const clipMaxX = Math.min(fx + fw, bounds.x + bounds.w);
+            const clipMinY = Math.max(fy, bounds.y);
+            const clipMaxY = Math.min(fy + fh, bounds.y + bounds.h);
 
             if (isExport) {
                 const gutterWidth = (dir === 'h') ? GUTTER_H : GUTTER_V;
                 const halfGutter = gutterWidth / 2;
                 context.fillStyle = 'white';
                 if (dir === 'h') {
+                    // [v9] (clipMinX, pos) から (clipMaxX, pos) まで
                     context.fillRect(clipMinX, pos - halfGutter, clipMaxX - clipMinX, gutterWidth);
                 } else {
+                    // [v9] (pos, clipMinY) から (pos, clipMaxY) まで
                     context.fillRect(pos - halfGutter, clipMinY, gutterWidth, clipMaxY - clipMinY);
                 }
                 context.strokeStyle = 'black';
@@ -304,24 +310,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // [v8修正] ドラッグ中の線も「端から端まで」引く
+    // [v9修正] ドラッグ中の線も「現在のコマ」の範囲内「だけ」で描画
     function drawDragKomaLine(context, x1, y1, x2, y2) {
         const page = getCurrentPage();
         if (!page || !page.frame) return;
         
         const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
-        const { x: fx, y: fy, w: fw, h: fh } = page.frame;
+        
+        // [v9] ドラッグ中の「現在」のコマを特定
+        const bounds = findKomaAt(page, x1, y1);
+        if (!bounds) return;
+
+        const clipMinX = bounds.x;
+        const clipMaxX = bounds.x + bounds.w;
+        const clipMinY = bounds.y;
+        const clipMaxY = bounds.y + bounds.h;
 
         context.strokeStyle = '#007bff'; 
         context.lineWidth = 1;
         context.setLineDash([4, 2]); // ドラッグ中だけ点線
         context.beginPath();
         if (dir === 'h') {
-            context.moveTo(fx, pos);
-            context.lineTo(fx + fw, pos);
+            context.moveTo(clipMinX, pos);
+            context.lineTo(clipMaxX, pos);
         } else {
-            context.moveTo(pos, fy);
-            context.lineTo(pos, fy + fh);
+            context.moveTo(pos, clipMinY);
+            context.lineTo(pos, clipMaxY);
         }
         context.stroke();
         context.setLineDash([]);
@@ -337,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // [v8] フキダシ描画 (右上アンカー)
+    // [v9] フキダシ描画 (右上アンカー)
     function drawSingleBubble(bubble, context) {
         const { x, y, w, h, shape, text, font } = bubble;
         context.save();
@@ -392,16 +406,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // コマ枠選択
         const gutter = getSelectedGutter(page);
         if(gutter && page.frame) { 
-            const { dir, pos } = gutter;
-            const { x: fx, y: fy, w: fw, h: fh } = page.frame;
+            const { dir, pos, bounds } = gutter;
+            if (!bounds) return; // [v9] 安全策
+            
+            // [v9] 描画ロジックと統一
+            const clipMinX = Math.max(page.frame.x, bounds.x);
+            const clipMaxX = Math.min(page.frame.x + page.frame.w, bounds.x + bounds.w);
+            const clipMinY = Math.max(page.frame.y, bounds.y);
+            const clipMaxY = Math.min(page.frame.y + page.frame.h, bounds.y + bounds.h);
+
             context.strokeStyle = '#007bff'; 
             context.lineWidth = 4; 
             context.setLineDash([6, 3]);
             context.beginPath();
             if (dir === 'h') {
-                context.moveTo(fx, pos); context.lineTo(fx + fw, pos);
+                context.moveTo(clipMinX, pos);
+                context.lineTo(clipMaxX, pos);
             } else {
-                context.moveTo(pos, fy); context.lineTo(pos, fy + fh);
+                context.moveTo(pos, clipMinY);
+                context.lineTo(pos, clipMaxY);
             }
             context.stroke();
             context.setLineDash([]);
@@ -421,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnPasteText.addEventListener('click', importText);
         btnPNG.addEventListener('click', exportPNG);
         btnZIP.addEventListener('click', exportZIP);
-        btnResetPage.addEventListener('click', resetCurrentPage); // [v8]
+        btnResetPage.addEventListener('click', resetCurrentPage); // [v9]
         btnReset.addEventListener('click', resetAllData); 
         shapeEllipse.addEventListener('click', () => setBubbleShape('ellipse'));
         shapeRect.addEventListener('click', () => setBubbleShape('rect'));
@@ -496,7 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function onPointerDown(e) {
-        // [v8] 既にキャプチャ中のポインターがあれば無視
         if (activePointerId !== null) return;
         
         const pageIndex = getPageIndex(e);
@@ -526,7 +548,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 isDragging = true;
                 dragStartX = x; dragStartY = y;
                 dragCurrentX = x; dragCurrentY = y;
-                // [v8] コマ枠ドラッグでもポインターキャプチャ
                 try {
                     activePointerId = e.pointerId;
                     e.target.setPointerCapture(e.pointerId); 
@@ -540,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 isDraggingBubble = true;
                 dragBubbleOffsetX = clickedBubble.x - x;
                 dragBubbleOffsetY = clickedBubble.y - y;
-                // [v8] ポインターキャプチャでスクロールを止める
+                // [v9] ポインターキャプチャでスクロールを止める
                 try {
                     activePointerId = e.pointerId;
                     e.target.setPointerCapture(e.pointerId); 
@@ -584,7 +605,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isDragging && state.currentTool === 'koma') {
             isDragging = false;
-            // [v8] ポインターキャプチャを解除
             try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
             activePointerId = null;
             
@@ -593,7 +613,6 @@ document.addEventListener('DOMContentLoaded', () => {
             saveAndRenderActivePage();
         } else if (isDraggingBubble) {
             isDraggingBubble = false;
-            // [v8] ポインターキャプチャを解除
             try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
             activePointerId = null;
             
@@ -605,10 +624,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function onPointerCancel(e) {
         if (activePointerId !== null && e.pointerId !== activePointerId) return;
-        
         try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
         activePointerId = null;
-
         if (isDragging) {
             isDragging = false;
             renderActivePage(); 
@@ -616,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isDraggingBubble) {
             isDraggingBubble = false;
             if (bubbleEditor.style.display !== 'block') {
-                 saveAndRenderActivePage(); // とりあえずドロップ扱いで保存
+                 saveAndRenderActivePage(); 
             }
         }
     }
@@ -667,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function deletePage() {
         if (state.pages.length <= 1) {
-            resetCurrentPage(); // [v8] 最後の1ページはリセット
+            resetCurrentPage(); // [v9] 最後の1ページはリセット
             return;
         }
         const deleteIndex = state.currentPageIndex;
@@ -688,7 +705,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePageIndicator(); 
     }
     
-    // [v8] 現在のページをリセット
     function resetCurrentPage() {
         const page = getCurrentPage();
         if (page) {
@@ -712,7 +728,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!page) return null; 
         const bubble = {
             id: `bubble_${Date.now()}`,
-            x: x, y: y, // [v8] (x, y) は「右上」
+            x: x, y: y, // [v9] (x, y) は「右上」
             w: 100, h: 50, 
             text: "セリフ",
             shape: 'ellipse',
@@ -829,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- コマ割りロジック ---
 
-    // [v8修正] 「お手本」のロジック（hitPanel）をv8用に改良
+    // [v9] 「お手本」のロジック（hitPanel）をv8用に改良
     // (x, y) が含まれる「パネル（空白領域）」の矩形を返す
     function findKomaAt(page, x, y) {
         const F = page.frame;
@@ -848,15 +864,14 @@ document.addEventListener('DOMContentLoaded', () => {
         let x0 = F.x, x1 = F.x + F.w, y0 = F.y, y1 = F.y + F.h;
 
         for (let i = 0; i < xs.length - 1; i++) {
-            if (x >= xs[i] && x < xs[i + 1]) { x0 = xs[i]; x1 = xs[i + 1]; break; }
+            if (x >= xs[i] && x <= xs[i + 1]) { x0 = xs[i]; x1 = xs[i + 1]; break; }
         }
         for (let i = 0; i < ys.length - 1; i++) {
-            if (y >= ys[i] && y < ys[i + 1]) { y0 = ys[i]; y1 = ys[i + 1]; break; }
+            if (y >= ys[i] && y <= ys[i + 1]) { y0 = ys[i]; y1 = ys[i + 1]; break; }
         }
         
         // 4. そのマス目が「ガターの空白」でないことを確認
         // (簡易チェック：マス目の中心がガター内なら、そのマスはガター)
-        // (このチェックは「お手本」のロジックにはなかったが、より正確なコマ特定のためにv8で追加)
         const midX = (x0 + x1) / 2;
         const midY = (y0 + y1) / 2;
         
@@ -876,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // [v8] タップ（水平線）判定
+    // [v9] タップ（水平線）判定
     function getKomaSnapDirection(x1, y1, x2, y2) {
         const dx = x2 - x1;
         const dy = y2 - y1;
@@ -901,29 +916,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const page = getCurrentPage();
         if (!page) return;
         const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
-        // [v8] 作成時のboundsを、新しいfindKomaAtで正しく取得
+        // [v9] 作成時のboundsを、新しいfindKomaAtで正しく取得
         const komaBounds = findKomaAt(page, x1, y1);
         page.gutters.push({
             id: `gutter_${Date.now()}`, 
             dir: dir, pos: Math.round(pos), 
-            bounds: komaBounds // boundsは「コマ順ソート」のために一応残す
+            bounds: komaBounds // boundsは「描画」と「コマ順ソート」に必須
         });
     }
 
-    // [v8修正] 当たり判定
+    // [v9修正] 当たり判定
     function findGutterAt(page, x, y) {
         if (!page) return null;
-        const { x: fx, y: fy, w: fw, h: fh } = page.frame;
         
         for (let i = page.gutters.length - 1; i >= 0; i--) {
             const gutter = page.gutters[i];
-            const { dir, pos } = gutter;
+            const { dir, pos, bounds } = gutter;
+            if (!bounds) continue;
+
+            // [v9] boundsの範囲内で当たり判定
+            const clipMinX = bounds.x;
+            const clipMaxX = bounds.x + bounds.w;
+            const clipMinY = bounds.y;
+            const clipMaxY = bounds.y + bounds.h;
             
             if (dir === 'h' && y >= pos - KOMA_HIT_THRESHOLD && y <= pos + KOMA_HIT_THRESHOLD) {
-                if (x >= fx && x <= fx + fw) return gutter; // 端から端まで
+                if (x >= clipMinX && x <= clipMaxX) return gutter;
             }
             if (dir === 'v' && x >= pos - KOMA_HIT_THRESHOLD && x <= pos + KOMA_HIT_THRESHOLD) {
-                if (y >= fy && y <= fy + fh) return gutter; // 端から端まで
+                if (y >= clipMinY && y <= clipMaxY) return gutter;
             }
         }
         return null;
@@ -944,17 +965,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- [v8] テキストコピー（コマ順ソート） ---
+    // --- [v9] テキストコピー（コマ順ソート） ---
     
-    // [v8] ページから全コマの矩形を計算する
+    // [v9] ページから全コマの矩形を計算する
     function findPanels(page) {
         if (!page.frame) return [];
         const knownBounds = new Set();
         let finalPanels = [];
         const { x: fx, y: fy, w: fw, h: fh } = page.frame;
         // サンプリングでコマを検出
-        for(let y = fy + 5; y < fy + fh; y += (fh / 10)) { // 5pxオフセット
-            for(let x = fx + 5; x < fx + fw; x += (fw / 10)) { // 5pxオフセット
+        for(let y = fy + 5; y < fy + fh; y += (fh / 20)) { 
+            for(let x = fx + 5; x < fx + fw; x += (fw / 20)) { 
                 const bounds = findKomaAt(page, x, y);
                 const key = `${bounds.x},${bounds.y},${bounds.w},${bounds.h}`;
                 if (bounds.w > 0 && bounds.h > 0 && !knownBounds.has(key)) {
@@ -971,7 +992,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return finalPanels;
     }
     
-    // [v8] コマ内のフキダシをソート（右優先→上優先）
+    // [v9] コマ内のフキダシをソート（右優先→上優先）
     function sortBubblesInPanel(bubbles) {
         return bubbles.sort((a, b) => {
             if (Math.abs(a.x - b.x) < 10) return a.y - b.y; 
@@ -987,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', () => {
             panels.forEach((panel) => {
                 let bubblesInPanel = [];
                 bubbles = bubbles.filter(b => {
-                    // [v8] 右上アンカー (b.x, b.y) がコマ内か
+                    // [v9] 右上アンカー (b.x, b.y) がコマ内か
                     if (b.x > panel.x && b.x <= panel.x + panel.w &&
                         b.y >= panel.y && b.y < panel.y + panel.h) {
                         bubblesInPanel.push(b);
@@ -1089,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         offCtx.fillStyle = 'white';
         offCtx.fillRect(0, 0, offCanvas.width / scaleX / renderDPR, offCanvas.height / scaleY / renderDPR);
         drawPageFrame(page, offCtx);
-        drawKoma(page, offCtx, true); // 書き出しモード
+        drawKoma(page, offCtx, true); // [v9] 修正された描画ロジックで書き出し
         page.bubbles.forEach(bubble => {
             drawSingleBubble(bubble, offCtx); 
         });
@@ -1097,7 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return offCanvas;
     }
 
-    // [v8] PNG書き出し (Web Share API)
+    // [v9] PNG書き出し (Web Share API)
     async function exportPNG() {
         const page = getCurrentPage();
         if (!page) return;
@@ -1149,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const url = URL.createObjectURL(content);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'manganame_v8.zip';
+                a.download = 'manganame_v9.zip';
                 a.click();
                 URL.revokeObjectURL(url);
             });
