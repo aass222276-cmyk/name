@@ -266,3 +266,6 @@ body, html {
     top: -9999px;
     opacity: 0;
 }
+
+/* disable scrolling while dragging elements */
+#canvasContainer.dragging { touch-action: none; overscroll-behavior: contain; }

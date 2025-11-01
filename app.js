@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { x: fx, y: fy, w: fw, h: fh } = page.frame;
 
         page.gutters.forEach(gutter => {
+            const mode = gutter.mode || (gutter.dir ? gutter.dir : 'h');
             const { dir, pos, bounds } = gutter;
             
             // [v11] v10のバグ（線が消える）を修正。
@@ -279,6 +280,30 @@ document.addEventListener('DOMContentLoaded', () => {
             // [v11] 描画範囲がマイナス（＝線が消えるバグ）になっていないかチェック
             if (clipMinX >= clipMaxX || clipMinY >= clipMaxY) return;
 
+            if (mode === 'd') {
+                // draw diagonal within clip rect
+                const line = clipLineToRect(gutter.x0, gutter.y0, gutter.x1, gutter.y1, {x: clipMinX, y: clipMinY, w: clipMaxX - clipMinX, h: clipMaxY - clipMinY});
+                if (!line) return;
+                if (isExport) {
+                    context.strokeStyle = 'black';
+                    context.lineWidth = 2;
+                    context.beginPath();
+                    context.moveTo(line.x0, line.y0);
+                    context.lineTo(line.x1, line.y1);
+                    context.stroke();
+                } else {
+                    context.strokeStyle = 'black';
+                    context.lineWidth = 2;
+                    context.setLineDash([]);
+                    context.beginPath();
+                    context.moveTo(line.x0, line.y0);
+                    context.lineTo(line.x1, line.y1);
+                    context.stroke();
+                }
+                return;
+            }
+
+
 
             if (isExport) {
                 const gutterWidth = (dir === 'h') ? GUTTER_H : GUTTER_V;
@@ -290,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     context.fillRect(pos - halfGutter, clipMinY, gutterWidth, clipMaxY - clipMinY);
                 }
                 context.strokeStyle = 'black';
-                context.lineWidth = 1;
+                context.lineWidth = 2;
                 context.beginPath();
                 if (dir === 'h') {
                     context.moveTo(clipMinX, pos - halfGutter); context.lineTo(clipMaxX, pos - halfGutter);
@@ -303,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 // エディタ上: 黒の「実線」
                 context.strokeStyle = 'black';
-                context.lineWidth = 1; 
+                context.lineWidth = 2; 
                 context.setLineDash([]); 
                 context.beginPath();
                 if (dir === 'h') {
@@ -323,7 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const page = getCurrentPage();
         if (!page || !page.frame) return;
         
-        const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
+        const snap = getKomaSnapDirection(x1, y1, x2, y2);
+        const dir = snap.mode; const pos = snap.pos; const ang = snap.angle;
         
         // [v11] ドラッグ中の「現在」のコマを特定
         const bounds = findKomaAt(page, x1, y1);
@@ -338,7 +364,15 @@ document.addEventListener('DOMContentLoaded', () => {
         context.lineWidth = 1;
         context.setLineDash([4, 2]); // ドラッグ中だけ点線
         context.beginPath();
-        if (dir === 'h') {
+        if (dir === 'd') {
+            const L = 5000; // big length to ensure crossing bounds
+            const ex0 = x1 - Math.cos(ang) * L;
+            const ey0 = y1 - Math.sin(ang) * L;
+            const ex1 = x1 + Math.cos(ang) * L;
+            const ey1 = y1 + Math.sin(ang) * L;
+            const line = clipLineToRect(ex0, ey0, ex1, ey1, bounds);
+            if (line) { context.moveTo(line.x0, line.y0); context.lineTo(line.x1, line.y1); }
+        } else if (dir === 'h') {
             context.moveTo(clipMinX, pos);
             context.lineTo(clipMaxX, pos);
         } else {
@@ -560,6 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
             //     state.selectedGutterId = clickedGutter.id;
             // } else { ... }
             isDragging = true;
+            canvasContainer.classList.add('dragging');
             dragStartX = x; dragStartY = y;
             dragCurrentX = x; dragCurrentY = y;
             try {
@@ -573,6 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (clickedBubble) {
                 state.selectedBubbleId = clickedBubble.id;
                 isDraggingBubble = true;
+                canvasContainer.classList.add('dragging');
                 dragBubbleOffsetX = clickedBubble.x - x;
                 dragBubbleOffsetY = clickedBubble.y - y;
                 // [v11] ポインターキャプチャでスクロールを止める
@@ -619,6 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isDragging && state.currentTool === 'koma') {
             isDragging = false;
+            canvasContainer.classList.remove('dragging');
             try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
             activePointerId = null;
             
@@ -627,6 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveAndRenderActivePage();
         } else if (isDraggingBubble) {
             isDraggingBubble = false;
+            canvasContainer.classList.remove('dragging');
             try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
             activePointerId = null;
             
@@ -642,10 +680,12 @@ document.addEventListener('DOMContentLoaded', () => {
         activePointerId = null;
         if (isDragging) {
             isDragging = false;
+            canvasContainer.classList.remove('dragging');
             renderActivePage(); 
         }
         if (isDraggingBubble) {
             isDraggingBubble = false;
+            canvasContainer.classList.remove('dragging');
             if (bubbleEditor.style.display !== 'block') {
                  saveAndRenderActivePage(); 
             }
@@ -811,9 +851,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = getSelectedBubble();
         if (bubble) {
             bubble.text = e.target.value;
-            // [v11修正] 入力中はリサイズも位置更新も「しない」
-            // measureBubbleSize(bubble);
-            // updateBubbleEditorPosition(bubble);
+            // 入力中も即リサイズ＆エディタ位置更新
+            measureBubbleSize(bubble);
+            updateBubbleEditorPosition(bubble);
+            renderActivePage();
         }
     }
     
@@ -861,6 +902,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- コマ割りロジック ---
+
+    // --- 斜め線用: 矩形クリッピング（Liang-Barsky） ---
+    function clipLineToRect(x0, y0, x1, y1, rect) {
+        // rect: {x,y,w,h}
+        let p = [-(x1 - x0), (x1 - x0), -(y1 - y0), (y1 - y0)];
+        let q = [x0 - rect.x, rect.x + rect.w - x0, y0 - rect.y, rect.y + rect.h - y0];
+        let u1 = 0, u2 = 1;
+        for (let i = 0; i < 4; i++) {
+            if (p[i] === 0) {
+                if (q[i] < 0) return null; // parallel outside
+            } else {
+                const t = q[i] / p[i];
+                if (p[i] < 0) {
+                    if (t > u2) return null;
+                    if (t > u1) u1 = t;
+                } else {
+                    if (t < u1) return null;
+                    if (t < u2) u2 = t;
+                }
+            }
+        }
+        const cx0 = x0 + (x1 - x0) * u1;
+        const cy0 = y0 + (y1 - y0) * u1;
+        const cx1 = x0 + (x1 - x0) * u2;
+        const cy1 = y0 + (y1 - y0) * u2;
+        return { x0: cx0, y0: cy0, x1: cx1, y1: cy1 };
+    }
+
 
     // [v11修正] 「お手本」を破棄。T-Junction（階層分割）ロジックをゼロから再実装。
     // (x, y) が含まれる「パネル（空白領域）」の矩形を返す
@@ -938,11 +1007,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // [v11] タップ（水平線）判定 + 斜め線は強制スナップ
     function getKomaSnapDirection(x1, y1, x2, y2) {
+
         const dx = x2 - x1;
         const dy = y2 - y1;
         const dist = Math.hypot(dx, dy);
         if (dist < KOMA_TAP_THRESHOLD) {
-            return { dir: 'h', pos: y1 }; // タップは水平
+            return { mode: 'h', pos: y1, angle: 0 };
+        }
+        let angle = Math.atan2(dy, dx) * 180 / Math.PI; 
+        // normalize to [-180, 180]
+        if (angle > 180) angle -= 360;
+        if (angle <= -180) angle += 360;
+
+        // snap near 0/180 or 90 deg
+        if (Math.abs(angle) <= SNAP_ANGLE_THRESHOLD || Math.abs(angle) >= 180 - SNAP_ANGLE_THRESHOLD) {
+            return { mode: 'h', pos: y1, angle: 0 };
+        }
+        if (Math.abs(angle - 90) <= SNAP_ANGLE_THRESHOLD || Math.abs(angle + 90) <= SNAP_ANGLE_THRESHOLD) {
+            return { mode: 'v', pos: x1, angle: 90 };
+        }
+        // free angle
+        return { mode: 'd', pos: null, angle: Math.atan2(dy, dx) }; // angle in radians for math usage
+
+
         }
         const angle = Math.atan2(dy, dx) * 180 / Math.PI; 
         let dir = null, pos = 0;
@@ -961,14 +1048,23 @@ document.addEventListener('DOMContentLoaded', () => {
     function addKomaLine(x1, y1, x2, y2) {
         const page = getCurrentPage();
         if (!page) return;
-        const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
+        const snap = getKomaSnapDirection(x1, y1, x2, y2);
+        const dir = snap.mode; const pos = snap.pos; const ang = snap.angle;
         // [v11] 作成時のboundsを、新しいfindKomaAtで正しく取得
         const komaBounds = findKomaAt(page, x1, y1);
-        page.gutters.push({
-            id: `gutter_${Date.now()}`, 
-            dir: dir, pos: Math.round(pos), 
-            bounds: komaBounds // boundsは「描画」と「コマ順ソート」に必須
-        });
+        if (dir === 'd') {
+            const L = 5000;
+            const ex0 = x1 - Math.cos(ang) * L;
+            const ey0 = y1 - Math.sin(ang) * L;
+            const ex1 = x1 + Math.cos(ang) * L;
+            const ey1 = y1 + Math.sin(ang) * L;
+            const clipped = clipLineToRect(ex0, ey0, ex1, ey1, komaBounds);
+            if (clipped) {
+                page.gutters.push({ id: `gutter_${Date.now()}`, mode: 'd', x0: clipped.x0, y0: clipped.y0, x1: clipped.x1, y1: clipped.y1, bounds: komaBounds });
+            }
+        } else {
+            page.gutters.push({ id: `gutter_${Date.now()}`, dir: dir, pos: Math.round(pos), bounds: komaBounds });
+        }
     }
 
     // [v11修正] 当たり判定
