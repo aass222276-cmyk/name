@@ -18,7 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSerif = document.getElementById('btnSerif');
     const btnKoma = document.getElementById('btnKoma');
     const sliderFontSize = document.getElementById('sliderFontSize');
-    const fontSizeValue = document.getElementById('fontSizeValue');
+    // [v11修正] span -> div
+    const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay'); 
     const btnPageAddBefore = document.getElementById('btnPageAddBefore');
     const btnPageAddAfter = document.getElementById('btnPageAddAfter');
     const btnPageDelete = document.getElementById('btnPageDelete');
@@ -26,14 +27,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPasteText = document.getElementById('btnPasteText');
     const btnPNG = document.getElementById('btnPNG');
     const btnZIP = document.getElementById('btnZIP');
-    const btnResetPage = document.getElementById('btnResetPage'); 
-    const btnReset = document.getElementById('btnReset'); 
+    // [v11修正] ページリセットボタンのIDを修正
+    // btnResetPage -> 'ページリセット'
+    // btnReset -> '全削除'
+    const btnResetPageEl = document.getElementById('btnResetPage'); // ページリセット
+    const btnResetAllEl = document.getElementById('btnReset');    // 全削除
+
     const selectionPanelBubble = document.getElementById('selectionPanelBubble');
     const shapeEllipse = document.getElementById('shapeEllipse');
     const shapeRect = document.getElementById('shapeRect');
     const deleteBubble = document.getElementById('deleteBubble');
-    const selectionPanelGutter = document.getElementById('selectionPanelGutter');
-    const deleteGutter = document.getElementById('deleteGutter');
+    // [v11] コマ枠削除パネルはHTMLから削除
+    // const selectionPanelGutter = document.getElementById('selectionPanelGutter');
+    // const deleteGutter = document.getElementById('deleteGutter');
     const bubbleEditor = document.getElementById('bubbleEditor');
     const textIO = document.getElementById('textIO');
     const pageIndicator = document.getElementById('pageIndicator');
@@ -120,7 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
             state.currentPageIndex = 0;
         }
         sliderFontSize.value = state.defaultFontSize;
-        fontSizeValue.textContent = `${state.defaultFontSize}px`;
+        // [v11修正] px表示
+        fontSizeValueDisplay.innerHTML = `${state.defaultFontSize}<br>px`;
     }
 
     // --- ページDOM生成 ---
@@ -195,7 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedBubble = getSelectedBubble();
         const selectedGutter = getSelectedGutter();
         selectionPanelBubble.classList.toggle('show', !!selectedBubble);
-        selectionPanelGutter.classList.toggle('show', !!selectedGutter);
+        // [v11] コマ枠削除パネルは廃止
+        // selectionPanelGutter.classList.toggle('show', !!selectedGutter);
         if (!selectedBubble) hideBubbleEditor();
         updatePageIndicator(); 
     }
@@ -250,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         context.strokeRect(x, y, w, h);
     }
 
-    // [v11修正] コマ枠の描画ロジック (v9と同じ＝boundsで止まる)
+    // [v11修正] コマ枠の描画ロジック (「突き抜け」バグの修正)
     function drawKoma(page, context, isExport = false) {
         if (!page.frame) return;
         const { x: fx, y: fy, w: fw, h: fh } = page.frame;
@@ -258,8 +266,8 @@ document.addEventListener('DOMContentLoaded', () => {
         page.gutters.forEach(gutter => {
             const { dir, pos, bounds } = gutter;
             
-            // [v11] v10の新しいfindKomaAtが正しいboundsを返すため、
-            // v9の「boundsで止まる」ロジックで正しく描画される。
+            // [v11] v10のバグ（線が消える）を修正。
+            // 描画にはv11で新造した「findKomaAt」が返す「正しいbounds」を使う。
             if (!bounds) return; 
             
             // bounds をページ外枠でさらにクリップ
@@ -446,12 +454,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btnPasteText.addEventListener('click', importText);
         btnPNG.addEventListener('click', exportPNG);
         btnZIP.addEventListener('click', exportZIP);
-        btnResetPage.addEventListener('click', resetCurrentPage); 
-        btnReset.addEventListener('click', resetAllData); 
+        // [v11修正] 正しいIDに
+        btnResetPageEl.addEventListener('click', resetCurrentPage); 
+        btnResetAllEl.addEventListener('click', resetAllData); 
         shapeEllipse.addEventListener('click', () => setBubbleShape('ellipse'));
         shapeRect.addEventListener('click', () => setBubbleShape('rect'));
         deleteBubble.addEventListener('click', deleteSelectedBubble);
-        deleteGutter.addEventListener('click', deleteSelectedGutter);
+        // [v11] コマ枠削除ボタンのリスナーは不要
+        // deleteGutter.addEventListener('click', deleteSelectedGutter);
         bubbleEditor.addEventListener('input', onBubbleEditorInput);
         bubbleEditor.addEventListener('blur', hideBubbleEditor);
         bubbleEditor.addEventListener('keydown', onBubbleEditorKeyDown);
@@ -493,7 +503,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateFontSize(e) {
         const newSize = parseInt(e.target.value, 10);
         state.defaultFontSize = newSize;
-        fontSizeValue.textContent = `${newSize}px`;
+        // [v11修正] px表示
+        fontSizeValueDisplay.innerHTML = `${newSize}<br>px`;
         const selectedBubble = getSelectedBubble();
         if (selectedBubble) {
             selectedBubble.font = newSize;
@@ -543,18 +554,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 showBubbleEditor(newBubble);
             }
         } else if (state.currentTool === 'koma') {
-            const clickedGutter = findGutterAt(page, x, y);
-            if (clickedGutter) {
-                state.selectedGutterId = clickedGutter.id;
-            } else {
-                isDragging = true;
-                dragStartX = x; dragStartY = y;
-                dragCurrentX = x; dragCurrentY = y;
-                try {
-                    activePointerId = e.pointerId;
-                    e.target.setPointerCapture(e.pointerId); 
-                } catch (err) {}
-            }
+            // [v11] コマ枠削除は廃止（ページリセットで対応）
+            // const clickedGutter = findGutterAt(page, x, y);
+            // if (clickedGutter) {
+            //     state.selectedGutterId = clickedGutter.id;
+            // } else { ... }
+            isDragging = true;
+            dragStartX = x; dragStartY = y;
+            dragCurrentX = x; dragCurrentY = y;
+            try {
+                activePointerId = e.pointerId;
+                e.target.setPointerCapture(e.pointerId); 
+            } catch (err) {}
+
         } else {
             // 選択モード (ツールがnull)
             const clickedBubble = findBubbleAt(page, x, y);
@@ -783,6 +795,8 @@ document.addEventListener('DOMContentLoaded', () => {
             bubbleEditor.style.display = 'none';
             const bubble = getSelectedBubble();
             if (bubble) {
+                // [v11修正] 入力確定（blur）時にリサイズ
+                measureBubbleSize(bubble); 
                 if (bubble.text.trim() === "") {
                     deleteSelectedBubble(); 
                     state.selectedBubbleId = null;
@@ -797,8 +811,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = getSelectedBubble();
         if (bubble) {
             bubble.text = e.target.value;
-            measureBubbleSize(bubble);
-            updateBubbleEditorPosition(bubble);
+            // [v11修正] 入力中はリサイズも位置更新も「しない」
+            // measureBubbleSize(bubble);
+            // updateBubbleEditorPosition(bubble);
         }
     }
     
@@ -857,11 +872,22 @@ document.addEventListener('DOMContentLoaded', () => {
         while (changed) { // どのガターにも分割されなくなるまで繰り返す
             changed = false;
             for (const gutter of page.gutters) {
-                const { dir, pos } = gutter;
+                const { dir, pos, bounds } = gutter;
                 const halfH = GUTTER_H / 2;
                 const halfV = GUTTER_V / 2;
                 
-                // 1. このガターは、そもそも currentBounds を「物理的に」分割しているか？
+                // [v11] このガターが、そもそも currentBounds に属しているか？
+                // (gutter.bounds が currentBounds を内包しているか、ほぼ一致)
+                const eps = 1; // 誤差
+                const gutterBelongsToCurrent = 
+                    (gutter.bounds.x <= currentBounds.x + eps &&
+                     gutter.bounds.y <= currentBounds.y + eps &&
+                     gutter.bounds.x + gutter.bounds.w >= currentBounds.x + currentBounds.w - eps &&
+                     gutter.bounds.y + gutter.bounds.h >= currentBounds.y + currentBounds.h - eps);
+                
+                if (!gutterBelongsToCurrent) continue;
+
+                // 1. このガターは、 currentBounds を「物理的に」分割しているか？
                 const crossesBounds = 
                     (dir === 'h' && pos > currentBounds.y && pos < currentBounds.y + currentBounds.h) ||
                     (dir === 'v' && pos > currentBounds.x && pos < currentBounds.x + currentBounds.w);
@@ -872,24 +898,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (dir === 'h') {
                     if (y > pos) { // ポイントがガターの下
                         const newY = pos + halfH;
-                        // 矩形の上端を newY に引き上げる
                         if (newY > currentBounds.y && newY < currentBounds.y + currentBounds.h) {
                             currentBounds.h = (currentBounds.y + currentBounds.h) - newY;
                             currentBounds.y = newY;
-                            changed = true; // 矩形が更新された
+                            changed = true; 
                         }
                     } else { // ポイントがガターの上
                         const newY = pos - halfH;
-                        // 矩形の下端を newY に引き下げる
                         if (newY < currentBounds.y + currentBounds.h && newY > currentBounds.y) {
                             currentBounds.h = newY - currentBounds.y;
-                            changed = true; // 矩形が更新された
+                            changed = true; 
                         }
                     }
                 } else { // dir === 'v'
                     if (x > pos) { // ポイントがガターの右
                         const newX = pos + halfV;
-                        // 矩形の左端を newX に引き上げる
                         if (newX > currentBounds.x && newX < currentBounds.x + currentBounds.w) {
                             currentBounds.w = (currentBounds.x + currentBounds.w) - newX;
                             currentBounds.x = newX;
@@ -897,13 +920,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else { // ポイントがガターの左
                         const newX = pos - halfV;
-                        // 矩形の右端を newX に引き下げる
                         if (newX < currentBounds.x + currentBounds.w && newX > currentBounds.x) {
                             currentBounds.w = newX - currentBounds.x;
                             changed = true;
                         }
                     }
                 }
+                
+                if(changed) break; // [v11] 1回分割したらループを最初からやり直す
+                
             } // end for
         } // end while
         
@@ -976,13 +1001,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return page.gutters.find(g => g.id === state.selectedGutterId);
     }
     
+    // [v11] コマ枠削除は廃止
     function deleteSelectedGutter() {
-        const page = getCurrentPage();
-        if (!page || !state.selectedGutterId) return;
-        page.gutters = page.gutters.filter(g => g.id !== state.selectedGutterId);
-        state.selectedGutterId = null;
-        updateUI();
-        saveAndRenderActivePage();
+        // const page = getCurrentPage();
+        // if (!page || !state.selectedGutterId) return;
+        // page.gutters = page.gutters.filter(g => g.id !== state.selectedGutterId);
+        // state.selectedGutterId = null;
+        // updateUI();
+        // saveAndRenderActivePage();
     }
 
 
@@ -998,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for(let y = fy + 5; y < fy + fh; y += (fh / 20)) { 
             for(let x = fx + 5; x < fx + fw; x += (fw / 20)) { 
                 const bounds = findKomaAt(page, x, y); // [v11] 新しいfindKomaAtを使用
-                const key = `${bounds.x},${bounds.y},${bounds.w},${bounds.h}`;
+                const key = `${bounds.x.toFixed(1)},${bounds.y.toFixed(1)},${bounds.w.toFixed(1)},${bounds.h.toFixed(1)}`;
                 if (bounds.w > 0 && bounds.h > 0 && !knownBounds.has(key)) {
                     knownBounds.add(key);
                     finalPanels.push(bounds);

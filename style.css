@@ -1,7 +1,7 @@
 /* --- 基本設定 --- */
 :root {
     --b5-ratio: 1.4142; /* B5縦 (√2) */
-    --toolbar-height: 94px; /* [v11修正] ツールバーの高さを 94px に (1.25倍) */
+    --toolbar-height: 75px; /* [v11修正] ツールバーの高さ 75px */
     --page-gap: 20px; /* ページ間の余白 */
     --gutter-h: 18px; /* 横ガター幅 */
     --gutter-v: 9px;  /* 縦ガター幅 */
@@ -23,14 +23,21 @@ body, html {
     flex-direction: column;
 }
 
-/* --- ツールバー (v11 縦長ボタン対応) --- */
+/* --- ツールバー (v11 縦長・固定) --- */
 #toolbar {
+    /* [v11修正] 画面上部に固定 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+
     display: flex;
     align-items: center;
     height: var(--toolbar-height);
     background-color: #444;
     padding: 0 10px;
-    gap: 6px; 
+    gap: 5px; /* [v11修正] 少し詰める */
     flex-shrink: 0;
     overflow-x: auto;
     overflow-y: hidden;
@@ -46,15 +53,15 @@ body, html {
     background: #666;
     border: 1px solid #888;
     color: white;
-    padding: 4px 6px; /* [v11修正] 横幅を狭く */
+    padding: 4px 2px; /* [v11修正] 横幅を狭く */
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
     flex-shrink: 0;
     white-space: normal; /* <br> を許可 */
-    line-height: 1.35;  /* [v11修正] 行間 */
-    font-size: 0.85rem;  /* [v11修正] 文字サイズ */
-    height: calc(var(--toolbar-height) - 20px); /* [v11修正] 高さを指定 */
+    line-height: 1.25;  /* [v11修正] 行間 */
+    font-size: 0.8rem;  
+    height: calc(var(--toolbar-height) - 16px); /* [v11修正] 高さを指定 */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -66,40 +73,55 @@ body, html {
 #toolbar button:hover { background: #777; }
 #toolbar button.active { background: #007bff; border-color: #0056b3; }
 
+/* [v11新設] 4文字ボタン（ペースト） */
+#toolbar button.btn-4char {
+    font-size: 0.7rem; /* 文字を小さく */
+    line-height: 1.1;  /* 行間を詰める */
+}
+
 #toolbar .separator {
     width: 1px;
-    height: 60px; /* [v11修正] 高さを調整 */
+    height: 48px; 
     background-color: #555;
     margin: 0 4px;
     flex-shrink: 0;
 }
 #toolbar .separator-right {
     width: 1px;
-    height: 60px;
+    height: 48px;
     background-color: #555;
     margin-left: auto; /* 右に寄せる */
     margin-right: 4px;
 }
 
 /* フォントスライダー（例外） */
-#toolbar label {
-    font-weight: bold;
-    flex-shrink: 0;
-    font-size: 1rem; 
-    line-height: 1;
-}
 #sliderFontSize {
     width: 60px; 
     flex-shrink: 0;
     height: auto; 
 }
-#fontSizeValue {
-    width: 40px;
-    text-align: right;
-    font-size: 0.9em;
+/* [v11新設] px表示部（div） */
+#fontSizeValueDisplay {
+    background: #666;
+    border: 1px solid #888;
+    color: white;
+    padding: 4px 2px;
+    border-radius: 4px;
+    font-weight: bold;
     flex-shrink: 0;
-    line-height: 1; 
+    white-space: normal;
+    line-height: 1.25;
+    font-size: 0.8rem;
+    height: calc(var(--toolbar-height) - 16px);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    min-width: 28px;
 }
+
 #btnReset, #btnResetPage {
     background: #a00;
 }
@@ -108,14 +130,15 @@ body, html {
 }
 
 
-/* --- キャンバス領域 --- */
+/* --- [v11修正] キャンバス領域 --- */
 #canvasContainer {
     flex-grow: 1;
     overflow-y: auto; 
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch; 
     background-color: #2a2a2a;
-    padding: var(--page-gap) 10px; 
+    /* [v11修正] ツールバーに隠れないよう、上部を押し下げる */
+    padding: calc(var(--toolbar-height) + var(--page-gap)) 10px var(--page-gap) 10px;
     box-sizing: border-box;
     position: relative; 
 }

@@ -14,25 +14,24 @@
 
     <div id="toolbar">
         
-        <button id="btnPageAddBefore" title="前にページ追加 (↑)">p<br>↑</button>
-        <button id="btnPageAddAfter" title="後にページ追加 (↓)">p<br>↓</button>
-        <button id="btnPageDelete" title="ページ削除 (X)">p<br>×</button>
+        <button id="btnPageAddBefore" title="前にページ追加">↑<br>追<br>加</button>
+        <button id="btnPageAddAfter" title="後にページ追加">追<br>加<br>↓</button>
+        <button id="btnPageDelete" title="ページ削除">P<br>削<br>除</button>
 
         <div class="separator"></div>
 
-        <button id="btnSerif" class="tool-toggle" title="セリフ (S)">セ<br>リフ</button>
-        <button id="btnKoma" class="tool-toggle" title="コマ枠 (K)">コマ<br>枠</button>
+        <button id="btnSerif" class="tool-toggle" title="セリフ (S)">セ<br>リ<br>フ</button>
+        <button id="btnKoma" class="tool-toggle" title="コマ枠 (K)">コ<br>マ<br>割</button>
         
         <div class="separator"></div>
 
-        <label for="sliderFontSize" title="文字サイズ">F:</label>
-        <input type="range" id="sliderFontSize" min="10" max="48" value="16">
-        <span id="fontSizeValue">16px</span>
+        <input type="range" id="sliderFontSize" min="10" max="48" value="16" title="文字サイズ">
+        <div id="fontSizeValueDisplay">16<br>px</div>
 
         <div class="separator"></div>
 
-        <button id="btnCopyText" title="テキストコピー">コ<br>ピー</button>
-        <button id="btnPasteText" title="テキストペースト">ペ<br>ースト</button>
+        <button id="btnCopyText" title="テキストコピー">コ<br>ピ<br>ー</button>
+        <button id="btnPasteText" title="テキストペースト" class="btn-4char">ペ<br>ー<br>ス<br>ト</button>
         
         <div class="separator"></div>
         
@@ -41,8 +40,7 @@
         
         <div class="separator-right"></div>
         
-        <button id="btnResetPage" title="このページをリセット">ページ<br>リセット</button>
-        <button id="btnReset" title="全リセット">全<br>リセット</button>
+        <button id="btnReset" title="全リセット">全<br>削<br>除</button>
     </div>
 
     <div id="canvasContainer">
@@ -56,10 +54,6 @@
         <button id="deleteBubble" class="delete vertical-btn">削除</button>
     </div>
     
-    <div id="selectionPanelGutter" class="selection-panel">
-        <button id="deleteGutter" class="delete vertical-btn">コマ枠<br>削除</button>
-    </div>
-
     <div id="pageIndicator">1 / 1</div>
 
     <textarea id="textIO" aria-hidden="true"></textarea>
