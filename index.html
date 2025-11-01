@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>Manga Name Editor v4</title>
+    <title>Manga Name Editor v5</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#FFFFFF">
@@ -14,9 +14,9 @@
 
     <div id="toolbar">
         
-        <button id="btnPageAddBefore" title="前にページ追加 (↑)">p↑</button>
-        <button id="btnPageAddAfter" title="後にページ追加 (↓)">p↓</button>
-        <button id="btnPageDelete" title="ページ削除 (X)">p×</button>
+        <button id="btnPageAddBefore" title="前にページ追加 (↑)">p<br>↑</button>
+        <button id="btnPageAddAfter" title="後にページ追加 (↓)">p<br>↓</button>
+        <button id="btnPageDelete" title="ページ削除 (X)">p<br>×</button>
 
         <div class="separator"></div>
 
@@ -31,17 +31,17 @@
 
         <div class="separator"></div>
 
-        <button id="btnCopyText" title="テキストコピー">Copy</button>
-        <button id="btnPasteText" title="テキストペースト">Paste</button>
+        <button id="btnCopyText" title="テキストコピー">コ<br>ピー</button>
+        <button id="btnPasteText" title="テキストペースト">ペ<br>ースト</button>
         
         <div class="separator"></div>
         
-        <button id="btnPNG" title="PNG書き出し">PNG</button>
-        <button id="btnZIP" title="ZIP書き出し">ZIP</button>
+        <button id="btnPNG" title="PNG書き出し">P<br>N<br>G</button>
+        <button id="btnZIP" title="ZIP書き出し">Z<br>I<br>P</button>
         
         <div class="separator-right"></div>
         
-        <button id="btnReset" title="全リセット">リセット</button>
+        <button id="btnReset" title="全リセット">リ<br>セット</button>
     </div>
 
     <div id="canvasContainer">
@@ -58,6 +58,7 @@
     <div id="selectionPanelGutter" class="selection-panel">
         <button id="deleteGutter" class="delete vertical-btn">コマ枠<br>削除</button>
     </div>
+
 
     <textarea id="textIO" aria-hidden="true"></textarea>
 

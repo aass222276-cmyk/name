@@ -1,19 +1,18 @@
 /* --- 基本設定 --- */
 :root {
     --b5-ratio: 1.4142; /* B5縦 (√2) */
-    --toolbar-height: 44px;
+    --toolbar-height: 60px; /* [v5修正] ツールバーの高さを 60px に */
     --page-gap: 20px; /* ページ間の余白 */
     --gutter-h: 18px; /* 横ガター幅 */
     --gutter-v: 9px;  /* 縦ガター幅 */
     --padding-bubble-x: 10px; /* 縦書きの左右余白 */
-    --padding-bubble-y: 8px;  /* 縦書きの上下余白 */
+    --padding-bubble-y: 8px;  /* 上下の余白 */
 }
 
 body, html {
     margin: 0;
     padding: 0;
     width: 100%;
-    /* [v4修正] 高さは自動（スクロールのため） */
     min-height: 100%; 
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: #333;
@@ -24,14 +23,14 @@ body, html {
     flex-direction: column;
 }
 
-/* --- ツールバー (v4レイアウト) --- */
+/* --- ツールバー (v5 縦書きボタン対応) --- */
 #toolbar {
     display: flex;
     align-items: center;
     height: var(--toolbar-height);
     background-color: #444;
     padding: 0 10px;
-    gap: 6px; /* [v4修正] ツール間隔 */
+    gap: 6px; 
     flex-shrink: 0;
     overflow-x: auto;
     overflow-y: hidden;
@@ -42,60 +41,59 @@ body, html {
 #toolbar::-webkit-scrollbar-track { background: #444; }
 #toolbar::-webkit-scrollbar-thumb { background-color: #888; border-radius: 3px; }
 
+/* [v5修正] 縦書きボタン対応 */
 #toolbar button {
     background: #666;
     border: 1px solid #888;
     color: white;
-    padding: 6px 8px; /* [v4修正] ボタン余白 */
+    padding: 4px 6px; /* [v5修正] 余白調整 */
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
     flex-shrink: 0;
-    white-space: nowrap;
+    white-space: normal; /* [v5修正] <br> を許可 */
+    line-height: 1.25;  /* [v5修正] 行間詰める */
+    font-size: 0.8rem;  /* [v5修正] 文字を小さく */
+    height: calc(var(--toolbar-height) - 16px); /* [v5修正] 高さを指定 */
+    box-sizing: border-box;
 }
 #toolbar button:hover { background: #777; }
 #toolbar button.active { background: #007bff; border-color: #0056b3; }
 
-/* [v4追加] 2段組みボタン */
-#btnSerif, #btnKoma {
-    line-height: 1.2;
-    font-size: 0.85rem;
-    padding-top: 4px;
-    padding-bottom: 4px;
-    white-space: normal;
-}
-
 #toolbar .separator {
     width: 1px;
-    height: 24px;
+    height: 36px; /* [v5修正] 高さを調整 */
     background-color: #555;
     margin: 0 4px;
     flex-shrink: 0;
 }
-/* [v4追加] 右端の余白用 */
 #toolbar .separator-right {
     width: 1px;
-    height: 24px;
+    height: 36px;
     background-color: #555;
     margin-left: auto; /* 右に寄せる */
     margin-right: 4px;
 }
 
+/* フォントスライダー（例外） */
 #toolbar label {
     font-weight: bold;
     flex-shrink: 0;
+    font-size: 1rem; /* [v5修正] 通常サイズ */
+    line-height: 1;
 }
 #sliderFontSize {
-    width: 60px; /* [v4修正] スライダー短縮 */
+    width: 60px; 
     flex-shrink: 0;
+    height: auto; /* [v5修正] 高さをリセット */
 }
 #fontSizeValue {
     width: 40px;
     text-align: right;
     font-size: 0.9em;
     flex-shrink: 0;
+    line-height: 1; /* [v5修正] 高さをリセット */
 }
-/* [v4追加] リセットボタン */
 #btnReset {
     background: #a00;
 }
@@ -104,68 +102,69 @@ body, html {
 }
 
 
-/* --- [v4修正] キャンバス領域 (縦スクロールコンテナ) --- */
+/* --- キャンバス領域 (v4から変更なし) --- */
 #canvasContainer {
     flex-grow: 1;
-    overflow-y: auto; /* 縦スクロール */
+    overflow-y: auto; 
     overflow-x: hidden;
-    -webkit-overflow-scrolling: touch; /* iOSでの慣性スクロール */
+    -webkit-overflow-scrolling: touch; 
     background-color: #2a2a2a;
-    padding: var(--page-gap) 10px; /* 上下左右の余白 */
+    padding: var(--page-gap) 10px; 
     box-sizing: border-box;
-    /* [v4] ドラッグ中のスクロールを制御するため */
     position: relative; 
 }
 
-/* [v4追加] 各ページ（canvas）のラッパー */
+/* ページラッパー (v4から変更なし) */
 .page-wrapper {
     width: 100%;
-    margin-bottom: var(--page-gap); /* ページ下の余白 */
+    margin-bottom: var(--page-gap); 
     box-sizing: border-box;
 }
 
-/* [v4追加] アクティブページのハイライト */
+/* アクティブページのハイライト (v4から変更なし) */
 .page-wrapper.active .mainCanvas {
     outline: 3px solid #007bff;
     box-shadow: 0 0 15px rgba(0,123,255,0.7);
 }
 
-/* [v4修正] canvasのスタイル */
+/* [v5修正] canvasのスタイル */
 .mainCanvas {
-    width: 100%; /* 横幅MAX */
-    height: auto; /* 高さは自動（比率維持） */
-    display: block; /* 不要な余白を削除 */
+    width: 100%; 
+    height: auto; 
+    display: block; 
     background: white;
-    aspect-ratio: calc(1 / var(--b5-ratio)); /* 比率固定 */
+    aspect-ratio: calc(1 / var(--b5-ratio)); 
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     cursor: default;
     
-    /* [v4] 縦スクロール(pan-y)は許可し、横(pan-x)は禁止 */
-    touch-action: pan-y;
+    /* [v5修正] ダブルタップズーム禁止、縦スクロールは許可 */
+    touch-action: manipulation;
 }
 .mainCanvas.tool-serif {
     cursor: text;
 }
-/* [v4] コマ枠モード中は縦スクロールも禁止（ドラッグ操作のため） */
 .mainCanvas.tool-koma {
     cursor: crosshair;
     touch-action: none; 
 }
+/* [v5追加] フキダシドラッグ中のスクロールを禁止 */
+.mainCanvas.dragging {
+    touch-action: none;
+}
 
 
-/* --- フキダシ入力エリア (縦書き) --- */
+/* --- フキダシ入力エリア (v4から変更なし) --- */
 #bubbleEditor {
     position: absolute;
     display: none;
     background: rgba(255, 255, 255, 0.95);
     border: 1px dashed #007bff;
     box-sizing: border-box;
-    overflow-y: auto; /* 縦（横方向）スクロール */
+    overflow-y: auto;
     resize: none;
     outline: none;
     font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
     z-index: 10;
-    
     writing-mode: vertical-rl;
     white-space: pre; 
     padding: var(--padding-bubble-y) var(--padding-bubble-x);
@@ -176,10 +175,10 @@ body, html {
 #bubbleEditor::-webkit-scrollbar { height: 6px; }
 #bubbleEditor::-webkit-scrollbar-thumb { background-color: #888; }
 
-/* --- 選択パネル (v4 縦書きボタン対応) --- */
+/* --- 選択パネル (v5 縦書きボタン対応) --- */
 .selection-panel {
-    position: fixed; /* [v4修正] スクロールに追従 */
-    bottom: 20px; /* 画面下部に固定 */
+    position: fixed; 
+    bottom: 20px; 
     left: 50%;
     transform: translateX(-50%);
     background: rgba(50, 50, 50, 0.9);
@@ -200,19 +199,19 @@ body, html {
     padding: 6px 10px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 1rem; /* [v4修正] 文字を大きく */
+    font-size: 1rem; 
 }
 .selection-panel button:hover {
     background: #777;
 }
-/* [v4追加] 縦書きボタン */
+/* [v5修正] 縦書きボタン */
 .selection-panel button.vertical-btn {
     writing-mode: vertical-rl;
     text-orientation: upright;
     padding: 10px 6px;
     line-height: 1.2;
     font-weight: bold;
-    height: 70px; /* 高さを指定 */
+    height: 60px; /* [v5修正] 高さを 60px に調整 */
 }
 /* 削除ボタン */
 .selection-panel button.delete {
