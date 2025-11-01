@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Manga Name Editor v3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Manga Name Editor v4</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#FFFFFF">
@@ -13,20 +13,21 @@
 <body>
 
     <div id="toolbar">
-        <button id="btnSerif" class="tool-toggle" title="セリフ (S)">セリフ</button>
-        <button id="btnKoma" class="tool-toggle" title="コマ枠 (K)">コマ</button>
+        
+        <button id="btnPageAddBefore" title="前にページ追加 (↑)">p↑</button>
+        <button id="btnPageAddAfter" title="後にページ追加 (↓)">p↓</button>
+        <button id="btnPageDelete" title="ページ削除 (X)">p×</button>
+
+        <div class="separator"></div>
+
+        <button id="btnSerif" class="tool-toggle" title="セリフ (S)">セ<br>リフ</button>
+        <button id="btnKoma" class="tool-toggle" title="コマ枠 (K)">コマ<br>枠</button>
         
         <div class="separator"></div>
 
         <label for="sliderFontSize" title="文字サイズ">F:</label>
         <input type="range" id="sliderFontSize" min="10" max="48" value="16">
         <span id="fontSizeValue">16px</span>
-
-        <div class="separator"></div>
-
-        <button id="btnPageAddBefore" title="前にページ追加 (↑)">p↑</button>
-        <button id="btnPageAddAfter" title="後にページ追加 (↓)">p↓</button>
-        <button id="btnPageDelete" title="ページ削除 (X)">p×</button>
 
         <div class="separator"></div>
 
@@ -37,27 +38,26 @@
         
         <button id="btnPNG" title="PNG書き出し">PNG</button>
         <button id="btnZIP" title="ZIP書き出し">ZIP</button>
+        
+        <div class="separator-right"></div>
+        
+        <button id="btnReset" title="全リセット">リセット</button>
     </div>
 
     <div id="canvasContainer">
-        <canvas id="mainCanvas"></canvas>
-        <textarea id="bubbleEditor"></textarea>
-    </div>
+        </div>
 
-    <div id="selectionPanelBubble">
-        <button id="shapeEllipse">楕円</button>
-        <button id="shapeRect">四角</button>
-        <button id="shapeSaw">ギザ</button>
-        <button id="deleteBubble">削除</button>
+    <textarea id="bubbleEditor"></textarea>
+
+    <div id="selectionPanelBubble" class="selection-panel">
+        <button id="shapeEllipse" class="vertical-btn">楕円</button>
+        <button id="shapeRect" class="vertical-btn">四角</button>
+        <button id="deleteBubble" class="delete vertical-btn">削除</button>
     </div>
     
-    <div id="selectionPanelGutter">
-        <button id="deleteGutter">コマ枠 削除</button>
+    <div id="selectionPanelGutter" class="selection-panel">
+        <button id="deleteGutter" class="delete vertical-btn">コマ枠<br>削除</button>
     </div>
-
-
-    <div id="pagestrip">
-        </div>
 
     <textarea id="textIO" aria-hidden="true"></textarea>
 
