@@ -1,6 +1,6 @@
 // Service Worker (sw.js)
 
-const SW_VERSION = 'manganame-v7.0.0'; // [v7] このバージョン番号の更新が必須です
+const SW_VERSION = 'manganame-v8.0.0'; // [v8] このバージョン番号の更新が必須です
 const CACHE_NAME = `manganame-cache-${SW_VERSION}`;
 
 // キャッシュする主要アセット
@@ -41,7 +41,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
-                    // [v7] v6以前のキャッシュをすべて削除
+                    // [v8] v7以前のキャッシュをすべて削除
                     if (cacheName !== CACHE_NAME && cacheName.startsWith('manganame-cache-')) {
                         console.log('Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
@@ -72,7 +72,6 @@ self.addEventListener('fetch', (event) => {
                 // キャッシュがなければネットワークにリクエスト
                 return fetch(event.request).catch(() => {
                     // オフラインでキャッシュにもない場合（エラー）
-                    // ここでフォールバックページを返すこともできる
                 });
             })
     );
