@@ -1,7 +1,7 @@
 /* --- 基本設定 --- */
 :root {
     --b5-ratio: 1.4142; /* B5縦 (√2) */
-    --toolbar-height: 75px; /* [v12] ツールバーの高さ 75px */
+    --toolbar-height: 75px; /* [v11修正] ツールバーの高さ 75px */
     --page-gap: 20px; /* ページ間の余白 */
     --gutter-h: 18px; /* 横ガター幅 */
     --gutter-v: 9px;  /* 縦ガター幅 */
@@ -23,9 +23,9 @@ body, html {
     flex-direction: column;
 }
 
-/* --- ツールバー (v12 縦長・固定) --- */
+/* --- ツールバー (v11 縦長・固定) --- */
 #toolbar {
-    /* [v12] 画面上部に固定 */
+    /* [v11修正] 画面上部に固定 */
     position: fixed;
     top: 0;
     left: 0;
@@ -37,7 +37,7 @@ body, html {
     height: var(--toolbar-height);
     background-color: #444;
     padding: 0 10px;
-    gap: 5px; 
+    gap: 5px; /* [v11修正] 少し詰める */
     flex-shrink: 0;
     overflow-x: auto;
     overflow-y: hidden;
@@ -48,35 +48,35 @@ body, html {
 #toolbar::-webkit-scrollbar-track { background: #444; }
 #toolbar::-webkit-scrollbar-thumb { background-color: #888; border-radius: 3px; }
 
-/* [v12] 縦長・縦書きボタン対応 */
+/* [v11修正] 縦長・縦書きボタン対応 */
 #toolbar button {
     background: #666;
     border: 1px solid #888;
     color: white;
-    padding: 4px 2px; 
+    padding: 4px 2px; /* [v11修正] 横幅を狭く */
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
     flex-shrink: 0;
     white-space: normal; /* <br> を許可 */
-    line-height: 1.25;  
+    line-height: 1.25;  /* [v11修正] 行間 */
     font-size: 0.8rem;  
-    height: calc(var(--toolbar-height) - 16px); 
+    height: calc(var(--toolbar-height) - 16px); /* [v11修正] 高さを指定 */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
-    min-width: 30px; 
+    min-width: 30px; /* [v11修正] 横幅をさらに狭く */
 }
 #toolbar button:hover { background: #777; }
 #toolbar button.active { background: #007bff; border-color: #0056b3; }
 
-/* [v12] 4文字ボタン（ペースト） */
+/* [v11新設] 4文字ボタン（ペースト） */
 #toolbar button.btn-4char {
-    font-size: 0.7rem; 
-    line-height: 1.1;  
+    font-size: 0.7rem; /* 文字を小さく */
+    line-height: 1.1;  /* 行間を詰める */
 }
 
 #toolbar .separator {
@@ -100,7 +100,7 @@ body, html {
     flex-shrink: 0;
     height: auto; 
 }
-/* [v12] px表示部（div） */
+/* [v11新設] px表示部（div） */
 #fontSizeValueDisplay {
     background: #666;
     border: 1px solid #888;
@@ -130,14 +130,14 @@ body, html {
 }
 
 
-/* --- [v12] キャンバス領域 --- */
+/* --- [v11修正] キャンバス領域 --- */
 #canvasContainer {
     flex-grow: 1;
     overflow-y: auto; 
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch; 
     background-color: #2a2a2a;
-    /* [v12] ツールバーに隠れないよう、上部を押し下げる */
+    /* [v11修正] ツールバーに隠れないよう、上部を押し下げる */
     padding: calc(var(--toolbar-height) + var(--page-gap)) 10px var(--page-gap) 10px;
     box-sizing: border-box;
     position: relative; 
@@ -156,7 +156,7 @@ body, html {
     box-shadow: 0 0 15px rgba(0,123,255,0.7);
 }
 
-/* [v12] canvasのスタイル */
+/* [v11] canvasのスタイル */
 .mainCanvas {
     width: 100%; 
     height: auto; 
@@ -166,7 +166,7 @@ body, html {
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     cursor: default;
     
-    /* [v12] ダブルタップズーム禁止、縦スクロールは許可 */
+    /* [v11] ダブルタップズーム禁止、縦スクロールは許可 */
     touch-action: manipulation;
 }
 .mainCanvas.tool-serif {
@@ -266,3 +266,4 @@ body, html {
     top: -9999px;
     opacity: 0;
 }
+#canvasContainer.dragging { touch-action: none; overscroll-behavior: contain; }
