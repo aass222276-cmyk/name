@@ -1,6 +1,6 @@
 // Service Worker (sw.js)
 
-const SW_VERSION = 'manganame-v6.0.0'; // [v6] このバージョン番号の更新が必須です
+const SW_VERSION = 'manganame-v7.0.0'; // [v7] このバージョン番号の更新が必須です
 const CACHE_NAME = `manganame-cache-${SW_VERSION}`;
 
 // キャッシュする主要アセット
@@ -12,7 +12,6 @@ const urlsToCache = [
     './manifest.webmanifest',
     './icons/icon-192.png',
     './icons/icon-512.png'
-    // JSZipはCDNからなのでキャッシュ対象外
 ];
 
 // 1. インストール
@@ -21,7 +20,14 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('Opened cache:', CACHE_NAME);
-                return cache.addAll(urlsToCache);
+                // ネットワークエラーを無視して、キャッシュできるものだけキャッシュする
+                return Promise.all(
+                    urlsToCache.map(url => {
+                        return cache.add(url).catch(err => {
+                            console.warn(`Failed to cache ${url}:`, err);
+                        });
+                    })
+                );
             })
             .then(() => {
                 self.skipWaiting(); // インストール後すぐにアクティベート
@@ -35,7 +41,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
-                    // [v6] v5以前のキャッシュをすべて削除
+                    // [v7] v6以前のキャッシュをすべて削除
                     if (cacheName !== CACHE_NAME && cacheName.startsWith('manganame-cache-')) {
                         console.log('Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
@@ -64,7 +70,10 @@ self.addEventListener('fetch', (event) => {
                     return response;
                 }
                 // キャッシュがなければネットワークにリクエスト
-                return fetch(event.request);
+                return fetch(event.request).catch(() => {
+                    // オフラインでキャッシュにもない場合（エラー）
+                    // ここでフォールバックページを返すこともできる
+                });
             })
     );
 });
