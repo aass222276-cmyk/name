@@ -266,3 +266,6 @@ body, html {
     top: -9999px;
     opacity: 0;
 }
+
+/* Dragging: lock scroll/overscroll while moving bubbles or drawing lines */
+#canvasContainer.dragging { touch-action: none; overscroll-behavior: contain; }
