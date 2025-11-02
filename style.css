@@ -1,7 +1,7 @@
 /* --- 基本設定 --- */
 :root {
     --b5-ratio: 1.4142; /* B5縦 (√2) */
-    --toolbar-height: 75px; /* [v14] ツールバーの高さ 75px */
+    --toolbar-height: 75px; /* [v15] ツールバーの高さ 75px */
     --page-gap: 20px; /* ページ間の余白 */
     --gutter-h: 18px; /* 横ガター幅 */
     --gutter-v: 9px;  /* 縦ガター幅 */
@@ -23,9 +23,9 @@ body, html {
     flex-direction: column;
 }
 
-/* --- ツールバー (v14 縦長・固定) --- */
+/* --- ツールバー (v15 縦長・固定) --- */
 #toolbar {
-    /* [v14] 画面上部に固定 */
+    /* [v15] 画面上部に固定 */
     position: fixed;
     top: 0;
     left: 0;
@@ -48,7 +48,7 @@ body, html {
 #toolbar::-webkit-scrollbar-track { background: #444; }
 #toolbar::-webkit-scrollbar-thumb { background-color: #888; border-radius: 3px; }
 
-/* [v14] 縦長・縦書きボタン対応 */
+/* [v15] 縦長・縦書きボタン対応 */
 #toolbar button {
     background: #666;
     border: 1px solid #888;
@@ -73,7 +73,7 @@ body, html {
 #toolbar button:hover { background: #777; }
 #toolbar button.active { background: #007bff; border-color: #0056b3; }
 
-/* [v14] 4文字ボタン（ペースト） */
+/* [v15] 4文字ボタン（ペースト） */
 #toolbar button.btn-4char {
     font-size: 0.7rem; 
     line-height: 1.1;  
@@ -100,7 +100,7 @@ body, html {
     flex-shrink: 0;
     height: auto; 
 }
-/* [v14] px表示部（div） */
+/* [v15] px表示部（div） */
 #fontSizeValueDisplay {
     background: #666;
     border: 1px solid #888;
@@ -122,28 +122,29 @@ body, html {
     min-width: 28px;
 }
 
-#btnReset, #btnResetPage {
+/* [v15修正] 新しいリセットボタンのスタイル */
+#btnReset, #btnResetPage, #btnResetPanels, #btnResetBubbles {
     background: #a00;
 }
-#btnReset:hover, #btnResetPage:hover {
+#btnReset:hover, #btnResetPage:hover, #btnResetPanels:hover, #btnResetBubbles:hover {
     background: #c00;
 }
 
 
-/* --- [v14] キャンバス領域 --- */
+/* --- [v15] キャンバス領域 --- */
 #canvasContainer {
     flex-grow: 1;
     overflow-y: auto; 
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch; 
     background-color: #2a2a2a;
-    /* [v14] ツールバーに隠れないよう、上部を押し下げる */
+    /* [v15] ツールバーに隠れないよう、上部を押し下げる */
     padding: calc(var(--toolbar-height) + var(--page-gap)) 10px var(--page-gap) 10px;
     box-sizing: border-box;
     position: relative; 
 }
 
-/* [v14新設] スクロール停止（手動トグル） */
+/* [v15新設] スクロール停止（手動トグル） */
 #canvasContainer.scroll-locked {
     overflow-y: hidden;
     touch-action: none;
@@ -163,7 +164,7 @@ body, html {
     box-shadow: 0 0 15px rgba(0,123,255,0.7);
 }
 
-/* [v14] canvasのスタイル */
+/* [v15] canvasのスタイル */
 .mainCanvas {
     width: 100%; 
     height: auto; 
@@ -173,7 +174,7 @@ body, html {
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     cursor: default;
     
-    /* [v14] ダブルタップズーム禁止、縦スクロールは許可 */
+    /* [v15] ダブルタップズーム禁止、縦スクロールは許可 */
     touch-action: manipulation;
 }
 .mainCanvas.tool-serif {
@@ -202,7 +203,7 @@ body, html {
     line-height: 1.2; 
     scrollbar-width: thin;
     
-    /* [v14修正] transform で配置（left/top=0固定）。ズレ防止 */
+    /* [v15修正] transform で配置（left/top=0固定）。ズレ防止 */
     left: 0;
     top: 0;
     transform: translate(0, 0);
@@ -271,7 +272,7 @@ body, html {
     pointer-events: none; /* タップを透過 */
 }
 
-/* [v14新設] スクロール固定ボタン */
+/* [v15新設] スクロール固定ボタン */
 #scrollLockBtn {
     position: fixed;
     bottom: 20px;
