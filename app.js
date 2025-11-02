@@ -1147,14 +1147,24 @@ function onBubbleEditorInput(e) {
             }
             const frame = page.frame;
             const { w: fw, h: fh } = frame;
-
-
-
-
             const startX = frame.x + fw - 30; // 右から
             const startY = frame.y + 30; // 上から
             let currentX = startX, currentY = startY;
-           
+            pageContent.bubbles.forEach((text) => {
+                const bubble = {
+                    id: `bubble_import_${Date.now()}_${bubbleSeq++}_${Math.random().toString(36).slice(2,6)}`,
+                    x: currentX, y: currentY, // 右上アンカー
+                    w: 0, h: 0, 
+                    text: text, shape: 'ellipse', font: state.defaultFontSize
+                };
+                measureBubbleSize(bubble);
+                page.bubbles.push(bubble);
+                currentY += bubble.h + 20; 
+                if (currentY > frame.y + fh - 50) { 
+                    currentY = startY;
+                    currentX -= 120; 
+                }
+            });
             insertIndex++;
         });
         updatePageIndices();
