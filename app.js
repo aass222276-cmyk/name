@@ -1129,6 +1129,9 @@ function onBubbleEditorInput(e) {
         const pagesData = parseTextImport(text);
         if (pagesData.length === 0) return;
         let insertIndex = state.currentPageIndex;
+        // ★ 重複ID防止：バブルの連番を持つ
+        let bubbleSeq = 0;
+
         pagesData.forEach((pageContent, i) => {
             let page;
             if (insertIndex < state.pages.length) {
@@ -1149,7 +1152,7 @@ function onBubbleEditorInput(e) {
             let currentX = startX, currentY = startY;
             pageContent.bubbles.forEach((text) => {
                 const bubble = {
-                    id: `bubble_import_${Date.now()}`,
+                    id: `bubble_import_${Date.now()}_${bubbleSeq++}_${Math.random().toString(36).slice(2,6)}`,
                     x: currentX, y: currentY, // 右上アンカー
                     w: 0, h: 0, 
                     text: text, shape: 'ellipse', font: state.defaultFontSize
