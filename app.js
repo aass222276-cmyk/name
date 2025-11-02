@@ -150,15 +150,80 @@ document.addEventListener('DOMContentLoaded', () => {
       return __viewportMeta;
     }
 
+    // ★ 強化版：確実に 1.0 へ戻す
     function __resetViewportZoom() {
+      // 二度押しガード
+      if (!__resetZoomBtn) return;
+      __resetZoomBtn.disabled = true;
+
+      const vv = window.visualViewport;
+      const TARGET = 1.02; // しきい値
       const m = __ensureViewportMeta();
-      // 一時的にズーム不可にして 1.0 へ戻す
+
+      // 1) まずは meta の min/max を 1 に固定（ズーム禁止）→ 2フレーム待機
+      const orig = __viewportOrig;
       m.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no');
-      // 少し待ってから元の設定に戻す（ズームがリセットされる）
-      setTimeout(() => {
-        m.setAttribute('content', __viewportOrig);
-        __updateResetZoomBtnVisibility();
-      }, 60);
+
+      const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const checkAndFinish = (phase) => {
+        if (!vv) {
+          // 非対応ブラウザはここで終了
+          m.setAttribute('content', orig);
+          __updateResetZoomBtnVisibility();
+          __placeResetZoomBtn && __placeResetZoomBtn();
+          __resetZoomBtn.disabled = false;
+          return true;
+        }
+        const s = vv.scale || 1;
+        if (s <= TARGET) {
+          // 元に戻す
+          m.setAttribute('content', orig);
+          __updateResetZoomBtnVisibility();
+          __placeResetZoomBtn && __placeResetZoomBtn();
+          __resetZoomBtn.disabled = false;
+          return true;
+        }
+        return false;
+      };
+
+      (async () => {
+        // Phase A: 2フレーム待機（meta固定の効果待ち）
+        await nextFrame();
+        await nextFrame();
+        if (checkAndFinish('A')) return;
+
+        // Phase B: meta を一旦 remove → 新規挿入（強制再評価）
+        try { document.head.removeChild(m); } catch (_) {}
+        const m2 = document.createElement('meta');
+        m2.name = 'viewport';
+        // initial-scale を微差で 1.0001 → 1.0 にトグルして再評価をより確実に
+        m2.content = 'width=device-width, initial-scale=1.0001, maximum-scale=1, minimum-scale=1, user-scalable=no';
+        document.head.appendChild(m2);
+
+        await nextFrame();
+        await nextFrame();
+        m2.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no');
+        await nextFrame();
+        if (!vv) {
+          m2.setAttribute('content', orig);
+          __updateResetZoomBtnVisibility();
+          __placeResetZoomBtn && __placeResetZoomBtn();
+          __resetZoomBtn.disabled = false;
+          return;
+        }
+        if ((vv.scale || 1) <= TARGET) {
+          m2.setAttribute('content', orig);
+          __updateResetZoomBtnVisibility();
+          __placeResetZoomBtn && __placeResetZoomBtn();
+          __resetZoomBtn.disabled = false;
+          return;
+        }
+
+        // Phase C: まれな異常系 → リロード（localStorage保存なので状態は保持）
+        try { m2.setAttribute('content', orig); } catch (_) {}
+        location.reload();
+      })();
     }
 
     function __ensureResetZoomBtn() {
@@ -190,11 +255,29 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(__resetZoomBtn);
     }
 
+    // ★ 追加：ボタンを常に画面内に配置
+    function __placeResetZoomBtn() {
+      if (!__resetZoomBtn || !window.visualViewport) return;
+      const vv = window.visualViewport;
+
+      const btn = __resetZoomBtn;
+      const btnRect = btn.getBoundingClientRect();
+      const desiredLeft = vv.offsetLeft + vv.width - btnRect.width - 12; // 右から12px
+      const desiredTop  = vv.offsetTop + (vv.height / 2) - (btnRect.height / 2);
+
+      btn.style.transform = `translate(${Math.round(desiredLeft)}px, ${Math.round(desiredTop)}px)`;
+      btn.style.left = '0px';
+      btn.style.top  = '0px';
+    }
+
     function __updateResetZoomBtnVisibility() {
       if (!window.visualViewport || !__resetZoomBtn) return;
       const s = window.visualViewport.scale || 1;
       // しきい値は 1.02（ご希望どおり）。<=1.02 なら非表示。
       __resetZoomBtn.style.display = (s > 1.02) ? 'block' : 'none';
+      if (__resetZoomBtn.style.display === 'block') {
+        __placeResetZoomBtn && __placeResetZoomBtn();
+      }
     }
 
     function initResetZoomUI() {
@@ -205,6 +288,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // 拡大縮小やビューポート移動で表示状態を更新
       window.visualViewport.addEventListener('resize', __updateResetZoomBtnVisibility);
       window.visualViewport.addEventListener('scroll', __updateResetZoomBtnVisibility);
+
+      // 配置も初期実行＆追従
+      __placeResetZoomBtn && __placeResetZoomBtn();
+      window.visualViewport.addEventListener('resize', __placeResetZoomBtn);
+      window.visualViewport.addEventListener('scroll', __placeResetZoomBtn);
     }
     // <<< v15 ResetZoom end
     // =========================================================
