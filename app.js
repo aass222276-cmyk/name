@@ -47,9 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         defaultFontSize: 16,
         selectedBubbleId: null,
         dpr: window.devicePixelRatio || 1,
-
-        isManualScrollLocked: false,   // 左下ボタンの手動ロック
-        isSelectionScrollLocked: false // セリフ選択中の自動ロック
+        isScrollLocked: false, // [v15新設]
     };
     
     let pageElements = []; // { wrapper: div, canvas: canvas, ctx: ctx }
@@ -62,51 +60,44 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragCurrentX = 0, dragCurrentY = 0;
     let dragBubbleOffsetX = 0, dragBubbleOffsetY = 0; 
     
+    // [v15] スクロールロック状態（手動トグル用）
+    let __scrollLocked = false;
+    let __scrollLockY = 0;
 
-function toggleScrollLock() {
-  state.isManualScrollLocked = !state.isManualScrollLocked;
-  applyScrollLock();
-}
-
+    // --- スクロールロック (v15: "手動" solution) ---
+    function toggleScrollLock() {
+        state.isScrollLocked = !state.isScrollLocked;
+        
+        if (state.isScrollLocked) {
+            // スクロールをロック
+            __scrollLockY = window.scrollY || 0;
+            document.body.style.position = 'fixed';
+            document.body.style.top = (-__scrollLockY) + 'px';
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+            // コンテナ自体のスクロールも止める
+            canvasContainer.classList.add('scroll-locked');
+            scrollLockBtn.classList.add('active');
+        } else {
+            // スクロールを解除
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            canvasContainer.classList.remove('scroll-locked');
+            scrollLockBtn.classList.remove('active');
+            window.scrollTo(0, __scrollLockY);
+        }
+    }
 
 // --- 自動スクロールロック（ドラッグ中だけ）---
 let __autoScrollLocked = false;
 let __autoScrollY = 0;
 
-function isAnyScrollLockOn() {
-  return state.isManualScrollLocked || state.isSelectionScrollLocked;
-}
-
-function applyScrollLock() {
-  const shouldLock = isAnyScrollLockOn();
-  if (shouldLock) {
-    const y = window.scrollY || 0;
-    document.body.style.position = 'fixed';
-    document.body.style.top = (-y) + 'px';
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
-    canvasContainer.classList.add('scroll-locked');
-    scrollLockBtn.classList.add('active');
-    // 記録（解除時に戻すため）
-    applyScrollLock.__y = y;
-  } else {
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
-    canvasContainer.classList.remove('scroll-locked');
-    scrollLockBtn.classList.remove('active');
-    if (typeof applyScrollLock.__y === 'number') {
-      window.scrollTo(0, applyScrollLock.__y);
-    }
-  }
-}
-
-
 function beginAutoScrollLock(){
-  if (state.isManualScrollLocked || __autoScrollLocked) return;
+  if (state.isScrollLocked || __autoScrollLocked) return;
   __autoScrollLocked = true;
   __autoScrollY = window.scrollY || 0;
   // body固定（親スクロールを完全停止）
@@ -123,7 +114,7 @@ function endAutoScrollLock(){
   if (!__autoScrollLocked) return;
   __autoScrollLocked = false;
   // ユーザーの手動ロックがOFFなら元に戻す（ONなら触らない）
-  if (!state.isManualScrollLocked){
+  if (!state.isScrollLocked){
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.left = '';
@@ -321,10 +312,9 @@ function endAutoScrollLock(){
         activeElement.wrapper.classList.add('active');
         state.currentPageIndex = index;
         updatePageIndicator(); 
-        if (scrollToPage && !isAnyScrollLockOn()) {
-  activeElement.wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
+        if (scrollToPage && !state.isScrollLocked) { // [v15] ロック中はスクロールしない
+            activeElement.wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     }
 
     // --- 描画 (指定ページのみ) ---
@@ -525,11 +515,8 @@ function endAutoScrollLock(){
     
     // 選択解除
     function clearSelection() {
-  state.selectedBubbleId = null;
-  state.isSelectionScrollLocked = false;
-  applyScrollLock();
-}
-
+        state.selectedBubbleId = null;
+    }
 
     // アクティブページ（現在選択中のページ）の再描画
     function renderActivePage() {
@@ -618,7 +605,7 @@ function endAutoScrollLock(){
         } else if (state.currentTool === 'koma') {
             isDragging = true;
             // [v15] 手動ロックがONなら、preventDefault()でスクロールを止める
-            if (state.isManualScrollLocked) e.preventDefault();
+            if (state.isScrollLocked) e.preventDefault();
             dragStartX = x; dragStartY = y;
             dragCurrentX = x; dragCurrentY = y;
 
@@ -630,7 +617,7 @@ function endAutoScrollLock(){
                 isDraggingBubble = true;
                 beginAutoScrollLock();
                 // [v15] 手動ロックがONなら、preventDefault()でスクロールを止める
-                if (state.isManualScrollLocked) e.preventDefault();
+                if (state.isScrollLocked) e.preventDefault();
                 dragBubbleOffsetX = clickedBubble.x - x;
                 dragBubbleOffsetY = clickedBubble.y - y;
             }
@@ -642,8 +629,7 @@ function endAutoScrollLock(){
 
 function onPointerMove(e) {
   // セリフ（バブル）移動中は常にスクロール抑止
-  if (isDraggingBubble || (state.isManualScrollLocked && isDragging)) {
-
+  if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
     e.preventDefault();
   } else if (!isDragging && !isDraggingBubble) {
     return; // ドラッグ中でなければ何もしない
@@ -672,7 +658,7 @@ function onPointerMove(e) {
 
     function onPointerUp(e) {
         // [v15] 手動ロックがON、かつドラッグ中のみ preventDefault
-        if (isDraggingBubble || (state.isManualScrollLocked && isDragging)) {
+        if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
             e.preventDefault();
         }
 
@@ -694,7 +680,7 @@ function onPointerMove(e) {
     }
     
     function onPointerCancel(e) {
-        if (state.isManualScrollLocked && (isDragging || isDraggingBubble)) {
+        if (state.isScrollLocked && (isDragging || isDraggingBubble)) {
             e.preventDefault();
         }
         isDragging = false;
@@ -711,15 +697,13 @@ function onPointerMove(e) {
     function onKeyDown(e) {
         const keyCode = e.code; 
         if (keyCode === 'Escape') {
-  if (bubbleEditor.style.display === 'block') {
-    bubbleEditor.blur();
-  } else {
-    clearSelection(); // ← これでOFF & applyScrollLock() まで走る
-    updateUI();
-    renderActivePage();
-  }
-}
-
+            if (bubbleEditor.style.display === 'block') bubbleEditor.blur(); 
+            else {
+                clearSelection();
+                updateUI();
+                renderActivePage();
+            }
+        }
         // [v15新設] 'L' キーでスクロールロック
         if (keyCode === 'KeyL' && e.target.tagName !== 'TEXTAREA') {
             toggleScrollLock();
@@ -855,9 +839,6 @@ function onPointerMove(e) {
     }
 
     function showBubbleEditor(bubble) {
-        state.isSelectionScrollLocked = true;
-        applyScrollLock();
-
         hideBubbleEditor(); 
         state.selectedBubbleId = bubble.id;
         bubbleEditor.value = bubble.text;
@@ -876,7 +857,7 @@ function onPointerMove(e) {
 function updateBubbleEditorPosition(bubble) {
   const canvas = pageElements[state.currentPageIndex].canvas;
   const r = canvas.getBoundingClientRect();
-  const scrollY = window.scrollY || 0;
+  const scrollY = canvasContainer.scrollTop;
 
   const w = bubble.w; // 物理の横幅（列の合計）
   const h = bubble.h; // 物理の縦幅（1列の長さ）
@@ -910,9 +891,6 @@ function updateBubbleEditorPosition(bubble) {
                 }
             }
         }
-        state.isSelectionScrollLocked = false;
-applyScrollLock();
-
     }
 
     // [v15修正] v13(No.116)の「入力限界」バグのあるロジックに差し戻し
