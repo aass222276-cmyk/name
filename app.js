@@ -823,16 +823,14 @@ function updateBubbleEditorPosition(bubble) {
   const canvasRect = canvas.getBoundingClientRect();
   const containerScrollTop = canvasContainer.scrollTop;
 
-- const editorWidth  = bubble.h; // CSS width (vertical size) is text height
-- const editorHeight = bubble.w; // CSS height (horizontal size) is text width
-+ // 縦書き（vertical-rl）では、横幅=列数（＝bubble.w）、高さ=各列の縦合計（＝bubble.h）
-+ const editorWidth  = bubble.w;
-+ const editorHeight = bubble.h;
+  // 縦書き（vertical-rl）：横幅＝列数（bubble.w）、高さ＝各列の合計（bubble.h）
+  const editorWidth  = bubble.w;
+  const editorHeight = bubble.h;
 
   bubbleEditor.style.width  = `${editorWidth}px`;
   bubbleEditor.style.height = `${editorHeight}px`;
 
-  bubbleEditor.style.left = `${canvasRect.left + bubble.x - bubble.w}px`;
+  bubbleEditor.style.left = `${canvasRect.left + bubble.x - editorWidth}px`;
   bubbleEditor.style.top  = `${canvasRect.top + containerScrollTop + bubble.y}px`;
 }
 
