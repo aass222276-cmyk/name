@@ -809,6 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bubbleEditor.style.display = 'block';
         bubbleEditor.style.fontSize = `${bubble.font}px`;
         bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
+        measureBubbleSize(bubble);
         updateBubbleEditorPosition(bubble);
         bubbleEditor.focus();
         if (bubble.text) {
@@ -862,9 +863,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = getSelectedBubble();
         if (bubble) {
             bubble.text = e.target.value;
-            // [v15] v13(No.116)の「リサイズしない」ロジック（入力限界バグが再発する）
-            // measureBubbleSize(bubble);
-            // updateBubbleEditorPosition(bubble);
+            // 入力に合わせて即リサイズ＆エディタ位置を更新
+            measureBubbleSize(bubble);
+            updateBubbleEditorPosition(bubble);
+            saveAndRenderActivePage();
+
         }
     }
     
