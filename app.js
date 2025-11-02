@@ -1,3 +1,4 @@
+// app.js
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- 定数 (v15) ---
@@ -92,39 +93,121 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-// --- 自動スクロールロック（ドラッグ中だけ）---
-let __autoScrollLocked = false;
-let __autoScrollY = 0;
+    // --- 自動スクロールロック（ドラッグ中だけ）---
+    let __autoScrollLocked = false;
+    let __autoScrollY = 0;
 
-function beginAutoScrollLock(){
-  if (state.isScrollLocked || __autoScrollLocked) return;
-  __autoScrollLocked = true;
-  __autoScrollY = window.scrollY || 0;
-  // body固定（親スクロールを完全停止）
-  document.body.style.position = 'fixed';
-  document.body.style.top = (-__autoScrollY) + 'px';
-  document.body.style.left = '0';
-  document.body.style.right = '0';
-  document.body.style.width = '100%';
-  // コンテナも保険で止める
-  canvasContainer.classList.add('scroll-locked');
-}
+    function beginAutoScrollLock(){
+      if (state.isScrollLocked || __autoScrollLocked) return;
+      __autoScrollLocked = true;
+      __autoScrollY = window.scrollY || 0;
+      // body固定（親スクロールを完全停止）
+      document.body.style.position = 'fixed';
+      document.body.style.top = (-__autoScrollY) + 'px';
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      // コンテナも保険で止める
+      canvasContainer.classList.add('scroll-locked');
+    }
 
-function endAutoScrollLock(){
-  if (!__autoScrollLocked) return;
-  __autoScrollLocked = false;
-  // ユーザーの手動ロックがOFFなら元に戻す（ONなら触らない）
-  if (!state.isScrollLocked){
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
-    canvasContainer.classList.remove('scroll-locked');
-    window.scrollTo(0, __autoScrollY);
-  }
-}
+    function endAutoScrollLock(){
+      if (!__autoScrollLocked) return;
+      __autoScrollLocked = false;
+      // ユーザーの手動ロックがOFFなら元に戻す（ONなら触らない）
+      if (!state.isScrollLocked){
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        canvasContainer.classList.remove('scroll-locked');
+        window.scrollTo(0, __autoScrollY);
+      }
+    }
 
+    // =========================================================
+    // >>> v15 ResetZoom start  （行目目安：このファイル冒頭から ~170付近）
+    // 目的：誤ズーム時のみ右中央に「戻す」ボタンを出し、1タップでズームを初期化
+    // 実装：visualViewport.scale を監視し、>1.02 で表示。
+    //       iOS/Safari を含む実機対策として meta[name="viewport"] の
+    //       content を一時的に min/max=1 & user-scalable=no に切替→復元でリセット。
+    let __resetZoomBtn = null;
+    let __viewportMeta = null;
+    let __viewportOrig = null;
+
+    function __ensureViewportMeta() {
+      if (!__viewportMeta) {
+        __viewportMeta = document.querySelector('meta[name="viewport"]');
+        if (!__viewportMeta) {
+          __viewportMeta = document.createElement('meta');
+          __viewportMeta.name = 'viewport';
+          __viewportMeta.content = 'width=device-width, initial-scale=1';
+          document.head.appendChild(__viewportMeta);
+        }
+        __viewportOrig = __viewportMeta.getAttribute('content') || 'width=device-width, initial-scale=1';
+      }
+      return __viewportMeta;
+    }
+
+    function __resetViewportZoom() {
+      const m = __ensureViewportMeta();
+      // 一時的にズーム不可にして 1.0 へ戻す
+      m.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no');
+      // 少し待ってから元の設定に戻す（ズームがリセットされる）
+      setTimeout(() => {
+        m.setAttribute('content', __viewportOrig);
+        __updateResetZoomBtnVisibility();
+      }, 60);
+    }
+
+    function __ensureResetZoomBtn() {
+      if (__resetZoomBtn) return;
+      __resetZoomBtn = document.createElement('button');
+      __resetZoomBtn.id = 'btnResetZoom';
+      __resetZoomBtn.type = 'button';
+      __resetZoomBtn.textContent = '戻す';
+      // インラインで必要最低限のスタイルを付与（外部CSSに依存しない）
+      Object.assign(__resetZoomBtn.style, {
+        position: 'fixed',
+        right: '12px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: '9999',
+        display: 'none',            // 初期は非表示
+        padding: '10px 14px',
+        borderRadius: '12px',
+        border: '1px solid rgba(0,0,0,0.25)',
+        background: 'rgba(255,255,255,0.95)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        fontSize: '14px',
+        lineHeight: '1',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        touchAction: 'manipulation',
+      });
+      __resetZoomBtn.addEventListener('click', __resetViewportZoom, { passive: true });
+      document.body.appendChild(__resetZoomBtn);
+    }
+
+    function __updateResetZoomBtnVisibility() {
+      if (!window.visualViewport || !__resetZoomBtn) return;
+      const s = window.visualViewport.scale || 1;
+      // しきい値は 1.02（ご希望どおり）。<=1.02 なら非表示。
+      __resetZoomBtn.style.display = (s > 1.02) ? 'block' : 'none';
+    }
+
+    function initResetZoomUI() {
+      if (!window.visualViewport) return; // 非対応ブラウザは何もしない
+      __ensureViewportMeta();
+      __ensureResetZoomBtn();
+      __updateResetZoomBtnVisibility();
+      // 拡大縮小やビューポート移動で表示状態を更新
+      window.visualViewport.addEventListener('resize', __updateResetZoomBtnVisibility);
+      window.visualViewport.addEventListener('scroll', __updateResetZoomBtnVisibility);
+    }
+    // <<< v15 ResetZoom end
+    // =========================================================
 
     // --- 初期化 ---
     function init() {
@@ -138,6 +221,9 @@ function endAutoScrollLock(){
             updateUI();
             setActivePage(state.currentPageIndex, false); 
             updatePageIndicator(); 
+            // 追加呼び出し：誤ズーム復帰ボタンの初期化
+            // アンカー: init() の rAF コールバックの末尾
+            initResetZoomUI(); // <<< ここだけ1行追加
         });
     }
 
@@ -627,34 +713,34 @@ function endAutoScrollLock(){
         renderActivePage();
     }
 
-function onPointerMove(e) {
-  // セリフ（バブル）移動中は常にスクロール抑止
-  if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
-    e.preventDefault();
-  } else if (!isDragging && !isDraggingBubble) {
-    return; // ドラッグ中でなければ何もしない
-  }
-
-  const page = getCurrentPage();
-  if (!page) return;
-  const { x, y } = getCanvasCoords(e);
-
-  if (isDragging && state.currentTool === 'koma') {
-    dragCurrentX = x;
-    dragCurrentY = y;
-    renderActivePage();
-  } else if (isDraggingBubble && state.currentTool === null) {
-    const bubble = getSelectedBubble();
-    if (bubble) {
-      bubble.x = x + dragBubbleOffsetX;
-      bubble.y = y + dragBubbleOffsetY;
-      if (bubbleEditor.style.display === 'block') {
-        updateBubbleEditorPosition(bubble);
+    function onPointerMove(e) {
+      // セリフ（バブル）移動中は常にスクロール抑止
+      if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
+        e.preventDefault();
+      } else if (!isDragging && !isDraggingBubble) {
+        return; // ドラッグ中でなければ何もしない
       }
-      renderActivePage();
+
+      const page = getCurrentPage();
+      if (!page) return;
+      const { x, y } = getCanvasCoords(e);
+
+      if (isDragging && state.currentTool === 'koma') {
+        dragCurrentX = x;
+        dragCurrentY = y;
+        renderActivePage();
+      } else if (isDraggingBubble && state.currentTool === null) {
+        const bubble = getSelectedBubble();
+        if (bubble) {
+          bubble.x = x + dragBubbleOffsetX;
+          bubble.y = y + dragBubbleOffsetY;
+          if (bubbleEditor.style.display === 'block') {
+            updateBubbleEditorPosition(bubble);
+          }
+          renderActivePage();
+        }
+      }
     }
-  }
-}
 
     function onPointerUp(e) {
         // [v15] 手動ロックがON、かつドラッグ中のみ preventDefault
@@ -854,27 +940,24 @@ function onPointerMove(e) {
         renderActivePage();
     }
     
-function updateBubbleEditorPosition(bubble) {
-  const canvas = pageElements[state.currentPageIndex].canvas;
-  const r = canvas.getBoundingClientRect();
-  const scrollY = canvasContainer.scrollTop;
+    function updateBubbleEditorPosition(bubble) {
+      const canvas = pageElements[state.currentPageIndex].canvas;
+      const r = canvas.getBoundingClientRect();
+      const scrollY = canvasContainer.scrollTop;
 
-  const w = bubble.w; // 物理の横幅（列の合計）
-  const h = bubble.h; // 物理の縦幅（1列の長さ）
+      const w = bubble.w; // 物理の横幅（列の合計）
+      const h = bubble.h; // 物理の縦幅（1列の長さ）
 
-  bubbleEditor.style.width  = `${w}px`;
-  bubbleEditor.style.height = `${h}px`;
+      bubbleEditor.style.width  = `${w}px`;
+      bubbleEditor.style.height = `${h}px`;
 
-  const left = r.left + bubble.x - w;   // 右上アンカー
-  const top  = r.top  + scrollY + bubble.y;
+      const left = r.left + bubble.x - w;   // 右上アンカー
+      const top  = r.top  + scrollY + bubble.y;
 
-  bubbleEditor.style.transform = `translate(${left}px, ${top}px)`;
-  bubbleEditor.style.left = '0px';
-  bubbleEditor.style.top  = '0px';
-}
-
-
-
+      bubbleEditor.style.transform = `translate(${left}px, ${top}px)`;
+      bubbleEditor.style.left = '0px';
+      bubbleEditor.style.top  = '0px';
+    }
 
     function hideBubbleEditor() {
         if (bubbleEditor.style.display === 'block') {
@@ -894,14 +977,14 @@ function updateBubbleEditorPosition(bubble) {
     }
 
     // [v15修正] v13(No.116)の「入力限界」バグのあるロジックに差し戻し
-function onBubbleEditorInput(e) {
-  const bubble = getSelectedBubble();
-  if (bubble) {
-    bubble.text = e.target.value;
-    measureBubbleSize(bubble);           // ←復活
-    updateBubbleEditorPosition(bubble);  // ←復活
-  }
-}
+    function onBubbleEditorInput(e) {
+      const bubble = getSelectedBubble();
+      if (bubble) {
+        bubble.text = e.target.value;
+        measureBubbleSize(bubble);           // ←復活
+        updateBubbleEditorPosition(bubble);  // ←復活
+      }
+    }
     
     function onBubbleEditorKeyDown(e) { /* Escはグローバルで処理 */ }
 
@@ -910,10 +993,10 @@ function onBubbleEditorInput(e) {
         const { text, font } = bubble;
         const lines = text.split('\n');
         const columnWidth = font * BUBBLE_LINE_HEIGHT; 
-        const charHeight = font * BUBBLE_LINE_HEIGHT * 0.9; 
+        theCharHeight = font * BUBBLE_LINE_HEIGHT * 0.9; 
         let maxHeight = 0;
         lines.forEach(line => {
-            const height = line.length * charHeight;
+            const height = line.length * theCharHeight;
             if (height > maxHeight) maxHeight = height;
         });
         if (maxHeight === 0) { 
@@ -1028,8 +1111,6 @@ function onBubbleEditorInput(e) {
     }
 
     // --- [v15] テキストコピー（コマ順ソート） ---
-    
-    // [v15] findPanelsは、単にソート済みのpanelsを返すだけ
     function findPanels(page) {
         if (!page.panels) return [];
         // コマを漫画の読み順（上→下、右→左）でソート
@@ -1039,7 +1120,6 @@ function onBubbleEditorInput(e) {
         });
     }
     
-    // [v15] コマ内のフキダシをソート（右優先→上優先）
     function sortBubblesInPanel(bubbles) {
         return bubbles.sort((a, b) => {
             if (Math.abs(a.x - b.x) < 10) return a.y - b.y; 
@@ -1047,14 +1127,12 @@ function onBubbleEditorInput(e) {
         });
     }
 
-    // [v15修正] exportText（「コピー抜け」バグ修正）
     function exportText() {
         let output = "";
         state.pages.forEach((page, pageIndex) => {
             const panels = findPanels(page);
             let bubbles = [...page.bubbles];
             
-            // [v15] "コピー抜け" バグ修正（No.121/125）
             const buckets = panels.map(() => []);
             let remaining = [];
             for (const b of bubbles) {
