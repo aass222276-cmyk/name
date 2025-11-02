@@ -1,14 +1,39 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>Manga Name Editor v15</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#FFFFFF">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="app.js" defer></script>
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>Manga Name Editor v15</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="./style.css">
+
+  <!-- PWA manifest（※実ファイル名を manifest.webmanifest に） -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#FFFFFF">
+
+  <!-- iOS / iPadOS ブックマーク & ホーム画面用 -->
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-180.png" sizes="180x180">
+  <!-- （任意だが推奨） -->
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-167.png" sizes="167x167">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-152.png" sizes="152x152">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-120.png" sizes="120x120">
+
+  <!-- favicon（ブックマーク一覧で使われることがある） -->
+  <link rel="icon" type="image/png" href="./icons/favicon-32.png" sizes="32x32">
+  <link rel="icon" type="image/png" href="./icons/favicon-16.png" sizes="16x16">
+
+  <!-- iOSのPWA表示の安定化（任意） -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <!-- JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="./app.js" defer></script>
+</head>
+
 </head>
 <body>
 
