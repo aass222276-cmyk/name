@@ -92,6 +92,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+// --- 自動スクロールロック（ドラッグ中だけ）---
+let __autoScrollLocked = false;
+let __autoScrollY = 0;
+
+function beginAutoScrollLock(){
+  if (state.isScrollLocked || __autoScrollLocked) return;
+  __autoScrollLocked = true;
+  __autoScrollY = window.scrollY || 0;
+  // body固定（親スクロールを完全停止）
+  document.body.style.position = 'fixed';
+  document.body.style.top = (-__autoScrollY) + 'px';
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.width = '100%';
+  // コンテナも保険で止める
+  canvasContainer.classList.add('scroll-locked');
+}
+
+function endAutoScrollLock(){
+  if (!__autoScrollLocked) return;
+  __autoScrollLocked = false;
+  // ユーザーの手動ロックがOFFなら元に戻す（ONなら触らない）
+  if (!state.isScrollLocked){
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    canvasContainer.classList.remove('scroll-locked');
+    window.scrollTo(0, __autoScrollY);
+  }
+}
+
 
     // --- 初期化 ---
     function init() {
@@ -582,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (clickedBubble) {
                 state.selectedBubbleId = clickedBubble.id;
                 isDraggingBubble = true;
+                beginAutoScrollLock();
                 // [v15] 手動ロックがONなら、preventDefault()でスクロールを止める
                 if (state.isScrollLocked) e.preventDefault();
                 dragBubbleOffsetX = clickedBubble.x - x;
@@ -593,38 +627,38 @@ document.addEventListener('DOMContentLoaded', () => {
         renderActivePage();
     }
 
-    function onPointerMove(e) {
-        // [v15] 手動ロックがON、かつドラッグ中のみ preventDefault
-        if (state.isScrollLocked && (isDragging || isDraggingBubble)) {
-            e.preventDefault(); 
-        } else if (!isDragging && !isDraggingBubble) {
-            return; // ドラッグ中でなければ何もしない
-        }
-        
-        const page = getCurrentPage();
-        if (!page) return;
-        const { x, y } = getCanvasCoords(e);
+function onPointerMove(e) {
+  // セリフ（バブル）移動中は常にスクロール抑止
+  if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
+    e.preventDefault();
+  } else if (!isDragging && !isDraggingBubble) {
+    return; // ドラッグ中でなければ何もしない
+  }
 
-        if (isDragging && state.currentTool === 'koma') {
-            dragCurrentX = x;
-            dragCurrentY = y;
-            renderActivePage(); 
-        } else if (isDraggingBubble && state.currentTool === null) {
-            const bubble = getSelectedBubble();
-            if (bubble) {
-                bubble.x = x + dragBubbleOffsetX;
-                bubble.y = y + dragBubbleOffsetY;
-                if (bubbleEditor.style.display === 'block') {
-                    updateBubbleEditorPosition(bubble);
-                }
-                renderActivePage();
-            }
-        }
+  const page = getCurrentPage();
+  if (!page) return;
+  const { x, y } = getCanvasCoords(e);
+
+  if (isDragging && state.currentTool === 'koma') {
+    dragCurrentX = x;
+    dragCurrentY = y;
+    renderActivePage();
+  } else if (isDraggingBubble && state.currentTool === null) {
+    const bubble = getSelectedBubble();
+    if (bubble) {
+      bubble.x = x + dragBubbleOffsetX;
+      bubble.y = y + dragBubbleOffsetY;
+      if (bubbleEditor.style.display === 'block') {
+        updateBubbleEditorPosition(bubble);
+      }
+      renderActivePage();
     }
+  }
+}
 
     function onPointerUp(e) {
         // [v15] 手動ロックがON、かつドラッグ中のみ preventDefault
-        if (state.isScrollLocked && (isDragging || isDraggingBubble)) {
+        if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
             e.preventDefault();
         }
 
@@ -636,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (bubbleEditor.style.display !== 'block') {
                  saveAndRenderActivePage();
             }
+            endAutoScrollLock();
         }
         
         // [v15] 共通のドラッグ終了処理
@@ -650,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         isDragging = false;
         isDraggingBubble = false;
+        endAutoScrollLock();
         activePointerId = null;
         
         if (bubbleEditor.style.display !== 'block') {

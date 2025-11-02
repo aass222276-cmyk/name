@@ -209,6 +209,10 @@ body, html {
     transform: translate(0, 0);
     will-change: transform;
     touch-action: none; /* IME中のフリック誤作動も軽減 */
+    text-orientation: upright; /* 1字ずつ正立（カーソルの通り道が素直になる） */
+    letter-spacing: 0;         /* カーソルのズレ抑制。任意で微調整可 */
+    caret-color: #000;
+
 }
 #bubbleEditor::-webkit-scrollbar { height: 6px; }
 #bubbleEditor::-webkit-scrollbar-thumb { background-color: #888; }
@@ -272,36 +276,38 @@ body, html {
     pointer-events: none; /* タップを透過 */
 }
 
-/* [v15新設] スクロール固定ボタン */
+/* [fix] 左下ロックボタンを横書き・1行表示に */
 #scrollLockBtn {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    z-index: 20;
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 20;
 
-    background: #666;
-    border: 1px solid #888;
-    color: white;
-    padding: 4px 2px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    white-space: normal;
-    line-height: 1.25;
-    font-size: 0.8rem;
-    height: 60px; /* 縦長のボタン */
-    width: 35px;  /* 横幅は狭く */
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+  background: #666;
+  border: 1px solid #888;
+  color: white;
+
+  /* ←ここを調整 */
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  white-space: nowrap;       /* 改行しない */
+  width: auto;               /* 固定幅やめる */
+  min-width: 70px;           /* お好みで縮めてOK */
+  height: 36px;              /* 縦長やめる */
+  padding: 6px 10px;         /* 余白調整 */
+  display: inline-flex;      /* 横並び維持 */
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 #scrollLockBtn.active {
-    background: #007bff;
-    border-color: #0056b3;
+  background: #007bff;
+  border-color: #0056b3;
 }
+
 
 /* --- 非表示のテキストエリア --- */
 #textIO {
