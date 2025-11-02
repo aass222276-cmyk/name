@@ -1,4 +1,3 @@
-// app.js
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- 定数 (v15) ---
@@ -62,38 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragBubbleOffsetX = 0, dragBubbleOffsetY = 0; 
     
     // [v15] スクロールロック状態（手動トグル用）
-    let __scrollLocked = false;
-    let __scrollLockY = 0;
-
-    // --- スクロールロック (v15: "手動" solution) ---
-    function toggleScrollLock() {
-        state.isScrollLocked = !state.isScrollLocked;
-        
-        if (state.isScrollLocked) {
-            // スクロールをロック
-            __scrollLockY = window.scrollY || 0;
-            document.body.style.position = 'fixed';
-            document.body.style.top = (-__scrollLockY) + 'px';
-            document.body.style.left = '0';
-            document.body.style.right = '0';
-            document.body.style.width = '100%';
-            // コンテナ自体のスクロールも止める
-            canvasContainer.classList.add('scroll-locked');
-            scrollLockBtn.classList.add('active');
-        } else {
-            // スクロールを解除
-            document.body.style.position = '';
-            document.body.style.top = '';
-            document.body.style.left = '';
-            document.body.style.right = '';
-            document.body.style.width = '';
-            canvasContainer.classList.remove('scroll-locked');
-            scrollLockBtn.classList.remove('active');
-            window.scrollTo(0, __scrollLockY);
-        }
-    }
-
-    // --- 自動スクロールロック（ドラッグ中だけ）---
     let __autoScrollLocked = false;
     let __autoScrollY = 0;
 
@@ -126,179 +93,45 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // =========================================================
-    // >>> v15 ResetZoom start  （行目目安：このファイル冒頭から ~170付近）
-    // 目的：誤ズーム時のみ右中央に「戻す」ボタンを出し、1タップでズームを初期化
-    // 実装：visualViewport.scale を監視し、>1.02 で表示。
-    //       iOS/Safari を含む実機対策として meta[name="viewport"] の
-    //       content を一時的に min/max=1 & user-scalable=no に切替→復元でリセット。
-    let __resetZoomBtn = null;
-    let __viewportMeta = null;
-    let __viewportOrig = null;
-
-    function __ensureViewportMeta() {
-      if (!__viewportMeta) {
-        __viewportMeta = document.querySelector('meta[name="viewport"]');
-        if (!__viewportMeta) {
-          __viewportMeta = document.createElement('meta');
-          __viewportMeta.name = 'viewport';
-          __viewportMeta.content = 'width=device-width, initial-scale=1';
-          document.head.appendChild(__viewportMeta);
-        }
-        __viewportOrig = __viewportMeta.getAttribute('content') || 'width=device-width, initial-scale=1';
+    // === ここから追加：ズーム全面禁止（最小編集） =====================
+    function lockZoomForever() {
+      // meta[name="viewport"] を強制固定
+      let meta = document.querySelector('meta[name="viewport"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'viewport';
+        document.head.appendChild(meta);
       }
-      return __viewportMeta;
+      // iOS/Safariでのピンチ・ダブルタップ拡大を根こそぎ抑止
+      const content = 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no';
+      meta.setAttribute('content', content);
+
+      // iOS系ピンチ（非標準gesture*）
+      const stop = e => e.preventDefault();
+      window.addEventListener('gesturestart', stop, { passive: false });
+      window.addEventListener('gesturechange', stop, { passive: false });
+      window.addEventListener('gestureend', stop, { passive: false });
+
+      // ダブルタップ拡大予防（300ms以内の連続touchendを抑止）
+      let lastTouchEnd = 0;
+      window.addEventListener('touchend', e => {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) e.preventDefault();
+        lastTouchEnd = now;
+      }, { passive: false });
+
+      // 一部端末のトラックパッド・ピンチ（Ctrl+wheel）
+      window.addEventListener('wheel', e => {
+        if (e.ctrlKey) e.preventDefault();
+      }, { passive: false });
     }
-
-    // ★ 強化版：確実に 1.0 へ戻す
-    function __resetViewportZoom() {
-      // 二度押しガード
-      if (!__resetZoomBtn) return;
-      __resetZoomBtn.disabled = true;
-
-      const vv = window.visualViewport;
-      const TARGET = 1.02; // しきい値
-      const m = __ensureViewportMeta();
-
-      // 1) まずは meta の min/max を 1 に固定（ズーム禁止）→ 2フレーム待機
-      const orig = __viewportOrig;
-      m.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no');
-
-      const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-      const checkAndFinish = (phase) => {
-        if (!vv) {
-          // 非対応ブラウザはここで終了
-          m.setAttribute('content', orig);
-          __updateResetZoomBtnVisibility();
-          __placeResetZoomBtn && __placeResetZoomBtn();
-          __resetZoomBtn.disabled = false;
-          return true;
-        }
-        const s = vv.scale || 1;
-        if (s <= TARGET) {
-          // 元に戻す
-          m.setAttribute('content', orig);
-          __updateResetZoomBtnVisibility();
-          __placeResetZoomBtn && __placeResetZoomBtn();
-          __resetZoomBtn.disabled = false;
-          return true;
-        }
-        return false;
-      };
-
-      (async () => {
-        // Phase A: 2フレーム待機（meta固定の効果待ち）
-        await nextFrame();
-        await nextFrame();
-        if (checkAndFinish('A')) return;
-
-        // Phase B: meta を一旦 remove → 新規挿入（強制再評価）
-        try { document.head.removeChild(m); } catch (_) {}
-        const m2 = document.createElement('meta');
-        m2.name = 'viewport';
-        // initial-scale を微差で 1.0001 → 1.0 にトグルして再評価をより確実に
-        m2.content = 'width=device-width, initial-scale=1.0001, maximum-scale=1, minimum-scale=1, user-scalable=no';
-        document.head.appendChild(m2);
-
-        await nextFrame();
-        await nextFrame();
-        m2.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no');
-        await nextFrame();
-        if (!vv) {
-          m2.setAttribute('content', orig);
-          __updateResetZoomBtnVisibility();
-          __placeResetZoomBtn && __placeResetZoomBtn();
-          __resetZoomBtn.disabled = false;
-          return;
-        }
-        if ((vv.scale || 1) <= TARGET) {
-          m2.setAttribute('content', orig);
-          __updateResetZoomBtnVisibility();
-          __placeResetZoomBtn && __placeResetZoomBtn();
-          __resetZoomBtn.disabled = false;
-          return;
-        }
-
-        // Phase C: まれな異常系 → リロード（localStorage保存なので状態は保持）
-        try { m2.setAttribute('content', orig); } catch (_) {}
-        location.reload();
-      })();
-    }
-
-    function __ensureResetZoomBtn() {
-      if (__resetZoomBtn) return;
-      __resetZoomBtn = document.createElement('button');
-      __resetZoomBtn.id = 'btnResetZoom';
-      __resetZoomBtn.type = 'button';
-      __resetZoomBtn.textContent = '戻す';
-      // インラインで必要最低限のスタイルを付与（外部CSSに依存しない）
-      Object.assign(__resetZoomBtn.style, {
-        position: 'fixed',
-        right: '12px',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        zIndex: '9999',
-        display: 'none',            // 初期は非表示
-        padding: '10px 14px',
-        borderRadius: '12px',
-        border: '1px solid rgba(0,0,0,0.25)',
-        background: 'rgba(255,255,255,0.95)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        fontSize: '14px',
-        lineHeight: '1',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        touchAction: 'manipulation',
-      });
-      __resetZoomBtn.addEventListener('click', __resetViewportZoom, { passive: true });
-      document.body.appendChild(__resetZoomBtn);
-    }
-
-    // ★ 追加：ボタンを常に画面内に配置
-    function __placeResetZoomBtn() {
-      if (!__resetZoomBtn || !window.visualViewport) return;
-      const vv = window.visualViewport;
-
-      const btn = __resetZoomBtn;
-      const btnRect = btn.getBoundingClientRect();
-      const desiredLeft = vv.offsetLeft + vv.width - btnRect.width - 12; // 右から12px
-      const desiredTop  = vv.offsetTop + (vv.height / 2) - (btnRect.height / 2);
-
-      btn.style.transform = `translate(${Math.round(desiredLeft)}px, ${Math.round(desiredTop)}px)`;
-      btn.style.left = '0px';
-      btn.style.top  = '0px';
-    }
-
-    function __updateResetZoomBtnVisibility() {
-      if (!window.visualViewport || !__resetZoomBtn) return;
-      const s = window.visualViewport.scale || 1;
-      // しきい値は 1.02（ご希望どおり）。<=1.02 なら非表示。
-      __resetZoomBtn.style.display = (s > 1.02) ? 'block' : 'none';
-      if (__resetZoomBtn.style.display === 'block') {
-        __placeResetZoomBtn && __placeResetZoomBtn();
-      }
-    }
-
-    function initResetZoomUI() {
-      if (!window.visualViewport) return; // 非対応ブラウザは何もしない
-      __ensureViewportMeta();
-      __ensureResetZoomBtn();
-      __updateResetZoomBtnVisibility();
-      // 拡大縮小やビューポート移動で表示状態を更新
-      window.visualViewport.addEventListener('resize', __updateResetZoomBtnVisibility);
-      window.visualViewport.addEventListener('scroll', __updateResetZoomBtnVisibility);
-
-      // 配置も初期実行＆追従
-      __placeResetZoomBtn && __placeResetZoomBtn();
-      window.visualViewport.addEventListener('resize', __placeResetZoomBtn);
-      window.visualViewport.addEventListener('scroll', __placeResetZoomBtn);
-    }
-    // <<< v15 ResetZoom end
-    // =========================================================
+    // === 追加ここまで ===============================================
 
     // --- 初期化 ---
     function init() {
+        // ★ 追加：最初にズーム禁止を有効化（最小編集）
+        lockZoomForever();
+
         registerServiceWorker();
         loadState();
         setupEventListeners();
@@ -309,9 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateUI();
             setActivePage(state.currentPageIndex, false); 
             updatePageIndicator(); 
-            // 追加呼び出し：誤ズーム復帰ボタンの初期化
-            // アンカー: init() の rAF コールバックの末尾
-            initResetZoomUI(); // <<< ここだけ1行追加
         });
     }
 
@@ -1081,10 +911,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const { text, font } = bubble;
         const lines = text.split('\n');
         const columnWidth = font * BUBBLE_LINE_HEIGHT; 
-        theCharHeight = font * BUBBLE_LINE_HEIGHT * 0.9; 
+        const charHeight = font * BUBBLE_LINE_HEIGHT * 0.9; 
         let maxHeight = 0;
         lines.forEach(line => {
-            const height = line.length * theCharHeight;
+            const height = line.length * charHeight;
             if (height > maxHeight) maxHeight = height;
         });
         if (maxHeight === 0) { 
@@ -1199,6 +1029,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- [v15] テキストコピー（コマ順ソート） ---
+    
+    // [v15] findPanelsは、単にソート済みのpanelsを返すだけ
     function findPanels(page) {
         if (!page.panels) return [];
         // コマを漫画の読み順（上→下、右→左）でソート
@@ -1208,6 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // [v15] コマ内のフキダシをソート（右優先→上優先）
     function sortBubblesInPanel(bubbles) {
         return bubbles.sort((a, b) => {
             if (Math.abs(a.x - b.x) < 10) return a.y - b.y; 
@@ -1215,12 +1048,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // [v15修正] exportText（「コピー抜け」バグ修正）
     function exportText() {
         let output = "";
         state.pages.forEach((page, pageIndex) => {
             const panels = findPanels(page);
             let bubbles = [...page.bubbles];
             
+            // [v15] "コピー抜け" バグ修正（No.121/125）
             const buckets = panels.map(() => []);
             let remaining = [];
             for (const b of bubbles) {
