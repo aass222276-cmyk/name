@@ -1,303 +1,60 @@
 /* eslint-disable no-unused-vars */
-/* 漫画ネーム用Webアプリ v14（問題1/4/5の最小修正を適用） */
+/* 漫画ネーム用Webアプリ v14（UI非変更：問題1/4/5の最小修正のみ） */
 
-(function () {
-    'use strict';
+document.addEventListener('DOMContentLoaded', () => {
 
-    /* ---------------------------
-       状態と要素の参照
-    ----------------------------*/
+    // --- 定数 (v13) ---
+    const STORAGE_KEY = 'manganame-v13'; // [v13]
+    const B5_ASPECT_RATIO = Math.sqrt(2);
+    const PAGE_FRAME_PADDING = 15;
+    const GUTTER_H = 18;
+    const GUTTER_V = 9;
+    const BUBBLE_PADDING_X = 10;
+    const BUBBLE_PADDING_Y = 8;
+    const BUBBLE_LINE_HEIGHT = 1.2;
+    const SNAP_ANGLE_THRESHOLD = 15;
+    const KOMA_TAP_THRESHOLD = 3;
+
+    // --- DOM要素 ---
+    const canvasContainer = document.getElementById('canvasContainer');
+    const btnSerif = document.getElementById('btnSerif');
+    const btnKoma = document.getElementById('btnKoma');
+    const sliderFontSize = document.getElementById('sliderFontSize');
+    const fontSizeValueDisplay = document.getElementById('fontSizeValueDisplay');
+    const btnPageAddBefore = document.getElementById('btnPageAddBefore');
+    const btnPageAddAfter = document.getElementById('btnPageAddAfter');
+    const btnPageDelete = document.getElementById('btnPageDelete');
+    const btnCopyText = document.getElementById('btnCopyText');
+    const btnPasteText = document.getElementById('btnPasteText');
+    const btnPNG = document.getElementById('btnPNG');
+
+    const pageIndicator = document.getElementById('pageIndicator');
+    const bubbleEditor = document.getElementById('bubbleEditor');
+    const selectionPanelBubble = document.getElementById('selectionPanelBubble');
+    const deleteBubbleBtn = document.getElementById('deleteBubble');
+
+    const textIO = document.getElementById('textIO');
+
+    // --- 状態 ---
     const state = {
-        pages: [],
+        pages: [],                  // {frame:{x,y,w,h}, panels:[{x,y,w,h},...], bubbles:[{id,text,x,y,w,h,font,shape}]}
         currentPageIndex: 0,
-        currentTool: null, // 'serif' | 'koma' | null
+        currentTool: null,          // 'serif' | 'koma' | null
         defaultFontSize: 24,
         idCounter: 1,
+        dragging: false,
+        draggingBubble: false,
+        dragStart: { x: 0, y: 0 },
+        dragNow:   { x: 0, y: 0 },
+        dragOffset: { x: 0, y: 0 },
         selectedBubbleId: null
     };
 
-    const appEl = document.getElementById('app');
-    const canvasContainer = document.getElementById('canvasContainer');
-    const toolbar = document.getElementById('toolbar');
-    const textIO = document.getElementById('textIO');
-    const bubbleEditor = document.getElementById('bubbleEditor');
-    const fontSizeRange = document.getElementById('fontSizeRange');
-    const fontSizeValueDisplay = document.getElementById('fontSizeValue');
+    const pageElements = []; // {wrapper, canvas}
 
-    const pageElements = []; // {wrapper, canvas, indexBadge}
-
-    /* ---------------------------
-       初期化
-    ----------------------------*/
-    function init() {
-        // 初期ページを生成（既存データがあれば復元処理を差し込む）
-        const page = createNewPage({ x: 20, y: 20, w: 680, h: Math.round(680 * 1.4142) });
-        state.pages.push(page);
-        addPageToDOM(page, 0);
-
-        fontSizeRange.value = state.defaultFontSize;
-        fontSizeValueDisplay.innerHTML = `${state.defaultFontSize}<br>px`;
-
-        attachToolbarEvents();
-        renderActivePage();
-    }
-
-    document.addEventListener('DOMContentLoaded', init);
-
-    /* ---------------------------
-       ページ＆描画ヘルパ
-    ----------------------------*/
-    function createNewPage(frame) {
-        return {
-            frame,
-            panels: [], // {x,y,w,h}
-            bubbles: [] // {id,text,x,y,w,h,font}
-        };
-    }
-
-    function addPageToDOM(page, index) {
-        const wrap = document.createElement('div');
-        wrap.className = 'page-wrapper';
-
-        const badge = document.createElement('div');
-        badge.className = 'page-index';
-        badge.textContent = `Page ${index + 1}`;
-        wrap.appendChild(badge);
-
-        const canvas = document.createElement('canvas');
-        canvas.className = 'page';
-        canvas.dataset.pageIndex = index;
-        wrap.appendChild(canvas);
-
-        canvasContainer.appendChild(wrap);
-
-        pageElements[index] = { wrapper: wrap, canvas, indexBadge: badge };
-        resizeCanvasToFrame(canvas, page.frame);
-
-        attachCanvasEvents(canvas);
-    }
-
-    function resizeCanvasToFrame(canvas, frame) {
-        canvas.width = Math.max(200, frame.w + frame.x * 2);
-        canvas.height = Math.max(200, frame.h + frame.y * 2);
-    }
-
-    function renderActivePage() {
-        const page = getCurrentPage();
-        const el = pageElements[state.currentPageIndex];
-        if (page && el) renderPage(page, el.canvas);
-    }
-
-    function renderPage(page, canvas) {
-        const ctx = canvas.getContext('2d');
-        const { x, y, w, h } = page.frame;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // フレーム
-        ctx.save();
-        ctx.strokeStyle = '#222';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, w, h);
-        ctx.restore();
-
-        // パネル
-        ctx.save();
-        ctx.strokeStyle = '#555';
-        ctx.lineWidth = 1;
-        for (const p of page.panels) ctx.strokeRect(p.x, p.y, p.w, p.h);
-        ctx.restore();
-
-        // バブル（矩形のみの簡易描画）
-        ctx.save();
-        ctx.fillStyle = 'rgba(0,0,0,0.06)';
-        ctx.strokeStyle = '#007bff';
-        for (const b of page.bubbles) {
-            ctx.strokeRect(b.x - b.w, b.y, b.w, b.h); // 右上アンカー
-        }
-        ctx.restore();
-    }
-
-    function getCurrentPage() {
-        return state.pages[state.currentPageIndex] || null;
-    }
-
-    function setActivePage(index, rerender = true) {
-        state.currentPageIndex = Math.max(0, Math.min(index, state.pages.length - 1));
-        pageElements.forEach((el, i) => {
-            if (!el) return;
-            el.indexBadge.textContent = `Page ${i + 1}`;
-        });
-        if (rerender) renderActivePage();
-    }
-
-    /* ---------------------------
-       UI
-    ----------------------------*/
-    function attachToolbarEvents() {
-        document.getElementById('toolSerif').addEventListener('click', () => setTool('serif'));
-        document.getElementById('toolKoma').addEventListener('click', () => setTool('koma'));
-        document.getElementById('toolSelect').addEventListener('click', () => setTool(null));
-
-        document.getElementById('btnCopy').addEventListener('click', exportText);
-        document.getElementById('btnPaste').addEventListener('click', importText);
-
-        fontSizeRange.addEventListener('input', updateFontSize);
-    }
-
-    function setTool(toolName) {
-        if (state.currentTool === toolName) state.currentTool = null;
-        else state.currentTool = toolName;
-        clearSelection();
-        updateUI();
-        renderActivePage();
-    }
-
-    function updateUI() {
-        document.getElementById('toolSerif').classList.toggle('active', state.currentTool === 'serif');
-        document.getElementById('toolKoma').classList.toggle('active', state.currentTool === 'koma');
-        document.getElementById('toolSelect').classList.toggle('active', state.currentTool === null);
-    }
-
-    function updateFontSize(e) {
-        const newSize = parseInt(e.target.value, 10);
-        state.defaultFontSize = newSize;
-        fontSizeValueDisplay.innerHTML = `${newSize}<br>px`;
-        const selectedBubble = getSelectedBubble();
-        if (selectedBubble) {
-            selectedBubble.font = newSize;
-            measureBubbleSize(selectedBubble);
-            if (bubbleEditor.style.display === 'block') updateBubbleEditorPosition(selectedBubble);
-            saveAndRenderActivePage();
-        }
-    }
-
-    function clearSelection() {
-        state.selectedBubbleId = null;
-        bubbleEditor.style.display = 'none';
-    }
-
-    function getSelectedBubble() {
-        const page = getCurrentPage();
-        if (!page) return null;
-        return page.bubbles.find(b => b.id === state.selectedBubbleId) || null;
-    }
-
-    /* ---------------------------
-       バブル（フキダシ）
-    ----------------------------*/
-    function createBubble(panel, x, y) {
-        const id = state.idCounter++;
-        const font = state.defaultFontSize;
-        const b = {
-            id,
-            text: '',
-            x: Math.min(panel.x + panel.w - 10, Math.max(panel.x + 10, x)),
-            y: Math.min(panel.y + 10, Math.max(panel.y, y)),
-            w: 100,
-            h: 120,
-            font
-        };
-        measureBubbleSize(b);
-        const page = getCurrentPage();
-        page.bubbles.push(b);
-        return b;
-    }
-
-    function measureBubbleSize(bubble) {
-        // 簡易：フォントサイズに比例
-        const lines = (bubble.text || '').split('\n');
-        const charPerLine = 10;
-        const cols = Math.max(1, Math.max(...lines.map(s => Math.ceil(s.length / charPerLine))));
-        const rows = Math.max(1, lines.length);
-        bubble.w = Math.max(60, cols * (bubble.font + 6));
-        bubble.h = Math.max(40, rows * (bubble.font + 8));
-    }
-
-    function showBubbleEditor(bubble) {
-        state.selectedBubbleId = bubble.id;
-        bubbleEditor.value = bubble.text;
-        bubbleEditor.style.display = 'block';
-        updateBubbleEditorPosition(bubble);
-        bubbleEditor.focus();
-    }
-
-    // v14: transform で配置（left/top固定のまま translate ）
-    function updateBubbleEditorPosition(bubble) {
-        const canvas = pageElements[state.currentPageIndex].canvas;
-
-        // bubble.x, bubble.y は「右上」アンカー
-        // コンテナ(#canvasContainer)基準の left/top を算出し、transformで配置する
-        const baseLeft = canvas.offsetLeft + (bubble.x - bubble.w);
-        const baseTop  = canvas.offsetTop + bubble.y;
-
-        // サイズは先に確定
-        const editorWidth = bubble.w;
-        const editorHeight = bubble.h;
-        bubbleEditor.style.width = `${editorWidth}px`;
-        bubbleEditor.style.height = `${editorHeight}px`;
-
-        bubbleEditor.style.left = '0px';
-        bubbleEditor.style.top = '0px';
-        bubbleEditor.style.transform = `translate(${baseLeft}px, ${baseTop}px)`;
-    }
-
-    bubbleEditor.addEventListener('input', () => {
-        const b = getSelectedBubble();
-        if (!b) return;
-        b.text = bubbleEditor.value;
-        measureBubbleSize(b);
-        updateBubbleEditorPosition(b);
-        renderActivePage();
-    });
-
-    bubbleEditor.addEventListener('blur', () => {
-        const b = getSelectedBubble();
-        if (!b) return;
-        b.text = bubbleEditor.value;
-        measureBubbleSize(b);
-        bubbleEditor.style.display = 'none';
-        saveAndRenderActivePage();
-    });
-
-    /* ---------------------------
-       コマ（簡易：配列管理のまま）
-    ----------------------------*/
-    function findPanels(page) {
-        if (page.panels.length === 0) {
-            // 全面を1コマ扱い
-            const { x, y, w, h } = page.frame;
-            return [{ x, y, w, h }];
-        }
-        return page.panels.slice();
-    }
-
-    function findPanelAt(page, x, y) {
-        const panels = findPanels(page);
-        return panels.find(p => x > p.x && x < p.x + p.w && y > p.y && y < p.y + p.h) || null;
-    }
-
-    /* ---------------------------
-       キャンバスイベント
-    ----------------------------*/
-    function attachCanvasEvents(canvas) {
-        canvas.addEventListener('pointerdown', onPointerDown);
-        canvas.addEventListener('pointermove', onPointerMove, { passive: false });
-        canvas.addEventListener('pointerup', onPointerUp);
-        canvas.addEventListener('pointercancel', onPointerCancel);
-    }
-
-    let activePointerId = null;
-    let isDragging = false; // コマ線ドラッグ
-    let isDraggingBubble = false; // フキダシドラッグ
-    let dragStartX = 0, dragStartY = 0;
-    let dragCurrentX = 0, dragCurrentY = 0;
-    let dragBubbleOffsetX = 0, dragBubbleOffsetY = 0; 
-
-    // --- スクロールロック（Safari慣性対策） ---
+    // --- スクロールロック（Safari慣性含む） ---
     let __scrollLocked = false;
     let __scrollLockY = 0;
-
     function lockScroll() {
         if (__scrollLocked) return;
         __scrollLocked = true;
@@ -307,7 +64,6 @@
         document.body.style.left = '0';
         document.body.style.right = '0';
         document.body.style.width = '100%';
-        // コンテナ側も慣性抑止
         canvasContainer.style.overscrollBehavior = 'contain';
         canvasContainer.style.touchAction = 'none';
     }
@@ -324,191 +80,347 @@
         window.scrollTo(0, __scrollLockY);
     }
 
-    function getCanvasCoords(e) {
-        const canvas = e.target;
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        return { x, y };
-    }
+    // ================= 初期化 =================
+    init();
 
-    function getPageIndex(e) {
-        return parseInt(e.target.dataset.pageIndex, 10);
-    }
+    function init() {
+        // 1ページ目を用意（保存復元があるならそこに差し替え）
+        const first = createNewPage();
+        state.pages.push(first);
+        addPageToDOM(first, 0);
+        setActivePage(0);
 
-    function onPointerDown(e) {
-        if (activePointerId !== null) return;
-        
-        const pageIndex = getPageIndex(e);
-        setActivePage(pageIndex, false); 
-        
-        const { x, y } = getCanvasCoords(e);
-        const page = getCurrentPage();
-        if (!page) return;
+        // ツールバー
+        btnSerif.addEventListener('click', () => setTool('serif'));
+        btnKoma.addEventListener('click', () => setTool('koma'));
+        sliderFontSize.addEventListener('input', onChangeFontSize);
+        btnCopyText.addEventListener('click', exportText);
+        btnPasteText.addEventListener('click', importText);
+        btnPNG.addEventListener('click', exportPNG);
+        btnPageAddBefore.addEventListener('click', () => addPageRelative(-1));
+        btnPageAddAfter.addEventListener('click', () => addPageRelative(+1));
+        btnPageDelete.addEventListener('click', deleteCurrentPage);
 
-        clearSelection();
-        const panel = findPanelAt(page, x, y);
-        if (!panel) return; // ページ外枠（パディング）をクリック
+        deleteBubbleBtn?.addEventListener('click', deleteSelectedBubble);
 
-        if (state.currentTool === 'serif') {
-            const clickedBubble = findBubbleAt(page, panel, x, y);
-            if (clickedBubble) {
-                state.selectedBubbleId = clickedBubble.id;
-                showBubbleEditor(clickedBubble);
-            } else {
-                const newBubble = createBubble(panel, x, y);
-                state.selectedBubbleId = newBubble.id;
-                showBubbleEditor(newBubble);
-            }
-        } else if (state.currentTool === 'koma') {
-            isDragging = true;
-            dragStartX = x; dragStartY = y;
-            dragCurrentX = x; dragCurrentY = y;
-            try {
-                activePointerId = e.pointerId;
-                e.target.setPointerCapture(e.pointerId); 
-            } catch (err) {}
-
-        } else {
-            // 選択モード (ツールがnull)
-            const clickedBubble = findBubbleAt(page, panel, x, y);
-            if (clickedBubble) {
-                state.selectedBubbleId = clickedBubble.id;
-                isDraggingBubble = true;
-                lockScroll();
-                dragBubbleOffsetX = clickedBubble.x - x;
-                dragBubbleOffsetY = clickedBubble.y - y;
-                try {
-                    activePointerId = e.pointerId;
-                    e.target.setPointerCapture(e.pointerId); 
-                } catch (err) { console.warn("Pointer capture failed:", err); }
-            }
-        }
-        
-        updateUI();
+        updateToolbarUI();
         renderActivePage();
     }
 
-    function onPointerMove(e) {
-        if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    // ================= ページ生成/表示 =================
+    function createNewPage() {
+        const W = Math.min(760, Math.max(620, Math.floor(window.innerWidth - 2 * PAGE_FRAME_PADDING)));
+        const H = Math.round(W * B5_ASPECT_RATIO);
+        return {
+            frame: { x: PAGE_FRAME_PADDING, y: PAGE_FRAME_PADDING, w: W, h: H },
+            panels: [],    // 分割が無ければframeが単一コマ扱い
+            bubbles: []    // 右上アンカー
+        };
+    }
+    function addPageToDOM(page, index) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'page-wrapper';
 
-        if (isDragging || isDraggingBubble) {
-            e.preventDefault(); // スクロール停止
+        const canvas = document.createElement('canvas');
+        canvas.className = 'page';
+        canvas.dataset.pageIndex = index.toString();
+        wrapper.appendChild(canvas);
+
+        canvas.width  = page.frame.w + page.frame.x * 2;
+        canvas.height = page.frame.h + page.frame.y * 2;
+
+        canvas.addEventListener('pointerdown', onPointerDown);
+        canvas.addEventListener('pointermove', onPointerMove, { passive: false });
+        canvas.addEventListener('pointerup', onPointerUp);
+        canvas.addEventListener('pointercancel', onPointerCancel);
+
+        canvasContainer.appendChild(wrapper);
+        pageElements[index] = { wrapper, canvas };
+    }
+    function setActivePage(i) {
+        state.currentPageIndex = Math.max(0, Math.min(i, state.pages.length - 1));
+        pageIndicator.textContent = `${state.currentPageIndex + 1} / ${state.pages.length}`;
+        renderActivePage();
+    }
+    function renderActivePage() {
+        const page = state.pages[state.currentPageIndex];
+        const canvas = pageElements[state.currentPageIndex].canvas;
+        const ctx = canvas.getContext('2d');
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 枠
+        const f = page.frame;
+        ctx.save();
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(f.x, f.y, f.w, f.h);
+        ctx.restore();
+
+        // パネル
+        ctx.save();
+        ctx.strokeStyle = '#555';
+        for (const p of findPanels(page)) ctx.strokeRect(p.x, p.y, p.w, p.h);
+        ctx.restore();
+
+        // バブル（矩形のみ簡易描画／右上アンカー基準）
+        ctx.save();
+        ctx.strokeStyle = '#007bff';
+        ctx.fillStyle = 'rgba(0,0,0,0.06)';
+        for (const b of page.bubbles) {
+            ctx.strokeRect(b.x - b.w, b.y, b.w, b.h);
         }
-        
-        const page = getCurrentPage();
-        if (!page) return;
-        const { x, y } = getCanvasCoords(e);
+        ctx.restore();
+    }
 
-        if (isDragging && state.currentTool === 'koma') {
-            dragCurrentX = x;
-            dragCurrentY = y;
-            renderActivePage(); 
-        } else if (isDraggingBubble && state.currentTool === null) {
-            const bubble = getSelectedBubble();
-            if (bubble) {
-                bubble.x = x + dragBubbleOffsetX;
-                bubble.y = y + dragBubbleOffsetY;
-                updateBubbleEditorPosition(bubble);
+    // ================= UI =================
+    function setTool(t) {
+        state.currentTool = (state.currentTool === t) ? null : t;
+        selectionPanelBubble?.classList.remove('show');
+        bubbleEditor.style.display = 'none';
+        updateToolbarUI();
+    }
+    function updateToolbarUI() {
+        btnSerif.classList.toggle('active', state.currentTool === 'serif');
+        btnKoma.classList.toggle('active', state.currentTool === 'koma');
+        sliderFontSize.value = state.defaultFontSize;
+        fontSizeValueDisplay.textContent = `${state.defaultFontSize}px`;
+    }
+    function onChangeFontSize(e) {
+        state.defaultFontSize = parseInt(e.target.value, 10) || 24;
+        fontSizeValueDisplay.textContent = `${state.defaultFontSize}px`;
+        const b = getSelectedBubble();
+        if (b) {
+            b.font = state.defaultFontSize;
+            measureBubbleSize(b);
+            if (bubbleEditor.style.display === 'block') updateBubbleEditorPosition(b);
+            renderActivePage();
+        }
+    }
+
+    // ================= パネル =================
+    function findPanels(page) {
+        if (!page.panels || page.panels.length === 0) {
+            const { x, y, w, h } = page.frame;
+            return [{ x, y, w, h }];
+        }
+        return page.panels;
+    }
+    function findPanelAt(page, x, y) {
+        const panels = findPanels(page);
+        for (const p of panels) if (x > p.x && x < p.x + p.w && y > p.y && y < p.y + p.h) return p;
+        return null;
+    }
+
+    // ================= バブル =================
+    function createBubble(panel, x, y) {
+        const id = state.idCounter++;
+        const b = {
+            id,
+            text: '',
+            x: Math.min(panel.x + panel.w - 6, Math.max(panel.x + 6, x)), // 右上アンカーx
+            y: Math.min(panel.y + 6, Math.max(panel.y, y)),               // 右上アンカーy
+            w: 120,
+            h: 120,
+            font: state.defaultFontSize,
+            shape: 'ellipse'
+        };
+        measureBubbleSize(b);
+        state.pages[state.currentPageIndex].bubbles.push(b);
+        return b;
+    }
+    function getSelectedBubble() {
+        const page = state.pages[state.currentPageIndex];
+        return page.bubbles.find(b => b.id === state.selectedBubbleId) || null;
+    }
+    function deleteSelectedBubble() {
+        const page = state.pages[state.currentPageIndex];
+        const i = page.bubbles.findIndex(b => b.id === state.selectedBubbleId);
+        if (i >= 0) {
+            page.bubbles.splice(i, 1);
+            state.selectedBubbleId = null;
+            bubbleEditor.style.display = 'none';
+            renderActivePage();
+        }
+    }
+    function measureBubbleSize(b) {
+        // 簡易計測：文字数から列×行を推定（縦書き）
+        const lines = (b.text || '').split('\n');
+        const charPerLine = 10;
+        const cols = Math.max(1, Math.max(...lines.map(s => Math.ceil(s.length / charPerLine))));
+        const rows = Math.max(1, lines.length);
+
+        b.w = Math.max(60, cols * (b.font + 6));
+        b.h = Math.max(40, rows * (b.font + 8));
+    }
+    function showBubbleEditor(b) {
+        state.selectedBubbleId = b.id;
+        bubbleEditor.value = b.text;
+        bubbleEditor.style.display = 'block';
+        updateBubbleEditorPosition(b);
+        bubbleEditor.focus();
+    }
+    // ---- 位置ズレ防止：transform 移動（コンテナ基準）----
+    function updateBubbleEditorPosition(bubble) {
+        const canvas = pageElements[state.currentPageIndex].canvas;
+
+        const baseLeft = canvas.offsetLeft + (bubble.x - bubble.w);
+        const baseTop  = canvas.offsetTop + bubble.y;
+
+        bubbleEditor.style.width = `${bubble.w}px`;
+        bubbleEditor.style.height = `${bubble.h}px`;
+
+        bubbleEditor.style.left = '0px';
+        bubbleEditor.style.top = '0px';
+        bubbleEditor.style.transform = `translate(${baseLeft}px, ${baseTop}px)`;
+    }
+    bubbleEditor.addEventListener('input', () => {
+        const b = getSelectedBubble();
+        if (!b) return;
+        b.text = bubbleEditor.value;
+        measureBubbleSize(b);
+        updateBubbleEditorPosition(b);
+        renderActivePage();
+    });
+    bubbleEditor.addEventListener('blur', () => {
+        const b = getSelectedBubble();
+        if (!b) return;
+        b.text = bubbleEditor.value;
+        measureBubbleSize(b);
+        bubbleEditor.style.display = 'none';
+        renderActivePage();
+    });
+
+    // ================= キャンバス・ポインタ =================
+    function canvasFromEvent(e) {
+        return e.currentTarget;
+    }
+    function canvasXY(e) {
+        const canvas = canvasFromEvent(e);
+        const r = canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function setPointerCaptureSafe(e) {
+        try { canvasFromEvent(e).setPointerCapture(e.pointerId); } catch {}
+    }
+    function releasePointerCaptureSafe(e) {
+        try { canvasFromEvent(e).releasePointerCapture(e.pointerId); } catch {}
+    }
+    function onPointerDown(e) {
+        const pageIndex = parseInt(canvasFromEvent(e).dataset.pageIndex || '0', 10);
+        setActivePage(pageIndex);
+
+        const { x, y } = canvasXY(e);
+        const page = state.pages[state.currentPageIndex];
+        const panel = findPanelAt(page, x, y);
+        if (!panel) return;
+
+        if (state.currentTool === 'serif') {
+            // 既存バブルか新規作成
+            const b = hitBubble(page, x, y) || createBubble(panel, x, y);
+            showBubbleEditor(b);
+        } else if (state.currentTool === 'koma') {
+            state.dragging = true;
+            state.dragStart = { x, y };
+            state.dragNow = { x, y };
+            setPointerCaptureSafe(e);
+        } else { // 選択モード：バブル移動
+            const b = hitBubble(page, x, y);
+            if (b) {
+                state.selectedBubbleId = b.id;
+                state.draggingBubble = true;
+                state.dragOffset = { x: b.x - x, y: b.y - y };
+                setPointerCaptureSafe(e);
+                lockScroll(); // ←ドラッグ中は必ず固定
                 renderActivePage();
+                return;
             }
         }
+        renderActivePage();
     }
-
+    function onPointerMove(e) {
+        if (state.dragging || state.draggingBubble) e.preventDefault(); // スクロール抑止
+        const { x, y } = canvasXY(e);
+        if (state.dragging) {
+            state.dragNow = { x, y };
+            renderActivePage(); // ガイド等あれば
+        } else if (state.draggingBubble) {
+            const b = getSelectedBubble();
+            if (!b) return;
+            b.x = x + state.dragOffset.x;
+            b.y = y + state.dragOffset.y;
+            updateBubbleEditorPosition(b);
+            renderActivePage();
+        }
+    }
     function onPointerUp(e) {
-        if (activePointerId !== null && e.pointerId !== activePointerId) return;
-
-        if (isDragging && state.currentTool === 'koma') {
-            isDragging = false;
-            try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
-            activePointerId = null;
-            
-            const { x, y } = getCanvasCoords(e);
-            addKomaLine(dragStartX, dragStartY, x, y);
-            saveAndRenderActivePage();
-        } else if (isDraggingBubble) {
-            isDraggingBubble = false;
-            unlockScroll();
-            try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
-            activePointerId = null;
-            
-            if (bubbleEditor.style.display !== 'block') {
-                 saveAndRenderActivePage();
-            }
+        if (state.dragging) {
+            state.dragging = false;
+            releasePointerCaptureSafe(e);
+            const { x, y } = canvasXY(e);
+            addKomaLine(state.dragStart.x, state.dragStart.y, x, y);
+            renderActivePage();
+        } else if (state.draggingBubble) {
+            state.draggingBubble = false;
+            releasePointerCaptureSafe(e);
+            unlockScroll(); // ←解除
+            renderActivePage();
         }
     }
-    
     function onPointerCancel(e) {
-        if (activePointerId !== null && e.pointerId !== activePointerId) return;
-        try { e.target.releasePointerCapture(activePointerId); } catch (err) {}
-        activePointerId = null;
-        if (isDragging) {
-            isDragging = false;
-            renderActivePage(); 
+        if (state.dragging) {
+            state.dragging = false;
+            releasePointerCaptureSafe(e);
+            renderActivePage();
         }
-        if (isDraggingBubble) {
-            isDraggingBubble = false;
+        if (state.draggingBubble) {
+            state.draggingBubble = false;
+            releasePointerCaptureSafe(e);
             unlockScroll();
-            if (bubbleEditor.style.display !== 'block') {
-                 saveAndRenderActivePage(); 
-            }
+            renderActivePage();
         }
     }
-
-    /* ---------------------------
-       バブル探索（右上アンカー基準）
-    ----------------------------*/
-    function findBubbleAt(page, panel, x, y) {
-        // 右上アンカー矩形内ヒット
+    function hitBubble(page, x, y) {
         for (let i = page.bubbles.length - 1; i >= 0; i--) {
             const b = page.bubbles[i];
-            if (x >= b.x - b.w && x <= b.x && y >= b.y && y <= b.y + b.h) {
-                return b;
-            }
+            if (x >= b.x - b.w && x <= b.x && y >= b.y && y <= b.y + b.h) return b;
         }
         return null;
     }
 
-    /* ---------------------------
-       コマ線（簡易: 分割を直矩形で作る）
-    ----------------------------*/
+    // ================= コマ割り（配列管理のまま） =================
     function addKomaLine(x1, y1, x2, y2) {
-        const page = getCurrentPage();
-        if (!page) return;
-        const { x, y, w, h } = page.frame;
+        const page = state.pages[state.currentPageIndex];
+        const f = page.frame;
 
-        // 角度判定：横 or 縦
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const isHorizontal = Math.abs(dy) < Math.abs(dx);
+        // 水平/垂直を判定
+        const dx = x2 - x1, dy = y2 - y1;
+        const horizontal = Math.abs(dy) < Math.abs(dx);
 
-        // まず既存パネルがなければフレームを1枚パネル扱い
         let panels = findPanels(page);
-        if (panels.length === 0) panels = [{ x, y, w, h }];
+        if (panels.length === 0) panels = [{ x: f.x, y: f.y, w: f.w, h: f.h }];
 
-        // クリック位置にあるパネルを対象に2分割
-        const panel = panels.find(p => x1 > p.x && x1 < p.x + p.w && y1 > p.y && y1 < p.y + p.h);
-        if (!panel) return;
+        const target = panels.find(p => x1 > p.x && x1 < p.x + p.w && y1 > p.y && y1 < p.y + p.h);
+        if (!target) return;
 
-        const idx = page.panels.indexOf(panel);
+        // 既存の panels から対象を取り除き、2分割をpush
+        const idx = page.panels.findIndex(p => p === target);
         if (idx >= 0) page.panels.splice(idx, 1);
 
-        if (isHorizontal) {
-            const splitY = Math.max(panel.y + 10, Math.min(panel.y + panel.h - 10, y1));
-            const top = { x: panel.x, y: panel.y, w: panel.w, h: splitY - panel.y };
-            const bottom = { x: panel.x, y: splitY, w: panel.w, h: panel.y + panel.h - splitY };
+        if (horizontal) {
+            const splitY = Math.max(target.y + 10, Math.min(target.y + target.h - 10, y1));
+            const top    = { x: target.x, y: target.y, w: target.w, h: splitY - target.y };
+            const bottom = { x: target.x, y: splitY,   w: target.w, h: target.y + target.h - splitY };
             page.panels.push(top, bottom);
         } else {
-            const splitX = Math.max(panel.x + 10, Math.min(panel.x + panel.w - 10, x1));
-            const left = { x: panel.x, y: panel.y, w: splitX - panel.x, h: panel.h };
-            const right = { x: splitX, y: panel.y, w: panel.x + panel.w - splitX, h: panel.h };
+            const splitX = Math.max(target.x + 10, Math.min(target.x + target.w - 10, x1));
+            const left   = { x: target.x, y: target.y, w: splitX - target.x, h: target.h };
+            const right  = { x: splitX,   y: target.y, w: target.x + target.w - splitX, h: target.h };
             page.panels.push(left, right);
         }
     }
 
-    /* ---------------------------
-       並び順（右優先→上優先）
-    ----------------------------*/
+    // ================= 並び順（右優先→上優先） =================
     function sortBubblesInPanel(arr) {
         arr.sort((a, b) => {
             const dx = (b.x - a.x);
@@ -517,24 +429,22 @@
         });
     }
 
-    /* ---------------------------
-       コピー（問題5：ガター上も最近傍に仮所属）
-    ----------------------------*/
+    // ================= コピー/ペースト =================
+    // 問題5: パネル外も最近傍パネルへ仮所属して出力
     function exportText() {
         let output = "";
-        state.pages.forEach((page, pageIndex) => {
+        state.pages.forEach((page, pi) => {
             const panels = findPanels(page);
             let remaining = [...page.bubbles];
 
-            // 各パネルのバケットを先に作成
+            // バケット
             const buckets = panels.map(() => []);
 
-            // まず「内側にある」ものをバケットへ
-            panels.forEach((panel, i) => {
+            // 内部にあるものを振り分け
+            panels.forEach((p, i) => {
                 const keep = [];
                 for (const b of remaining) {
-                    if (b.x > panel.x && b.x <= panel.x + panel.w &&
-                        b.y >= panel.y && b.y < panel.y + panel.h) {
+                    if (b.x > p.x && b.x <= p.x + p.w && b.y >= p.y && b.y < p.y + p.h) {
                         buckets[i].push(b);
                     } else {
                         keep.push(b);
@@ -543,7 +453,7 @@
                 remaining = keep;
             });
 
-            // 残ったバブルは最近傍パネルへ仮所属（マンハッタン距離）
+            // 残りは最近傍へ（マンハッタン距離）
             function nearestPanelIndex(b) {
                 let bestI = 0, bestD = Infinity;
                 for (let i = 0; i < panels.length; i++) {
@@ -556,12 +466,11 @@
                 return bestI;
             }
             for (const b of remaining) {
-                if (panels.length === 0) continue;
-                const i = nearestPanelIndex(b);
-                buckets[i].push(b);
+                if (panels.length === 0) continue; // 念のため
+                buckets[nearestPanelIndex(b)].push(b);
             }
 
-            // バケットを読み順で吐き出し（各バケットは右優先→上優先）
+            // 各パネル内は右優先→上優先で並べて出力
             buckets.forEach((arr) => {
                 sortBubblesInPanel(arr);
                 arr.forEach((bubble) => {
@@ -570,9 +479,7 @@
                 });
             });
 
-            if (pageIndex < state.pages.length - 1) {
-                output += "\n\n";
-            }
+            if (pi < state.pages.length - 1) output += "\n\n";
         });
 
         textIO.value = output.trim();
@@ -581,20 +488,18 @@
         try {
             document.execCommand('copy');
             alert('全ページのテキストをコピーしました。');
-        } catch (e) {
+        } catch {
             alert('コピーに失敗しました。手動でコピーしてください。');
         }
         textIO.style.display = 'none';
     }
 
-    /* ---------------------------
-       ペースト（現行のレイアウト維持）
-    ----------------------------*/
     function importText() {
         const raw = prompt('貼り付けテキストを入力（空行1つで同ページ、2つ以上で次ページ）:');
         if (!raw || !raw.trim()) return;
 
-        const pagesText = raw.replace(/\r\n/g, '\n').split(/\n{2,}/); // 2個以上の空行でページ区切り
+        // 2つ以上の空行でページ区切り
+        const pagesText = raw.replace(/\r\n/g, '\n').split(/\n{2,}/);
         let insertIndex = state.currentPageIndex;
 
         for (let i = 0; i < pagesText.length; i++) {
@@ -603,42 +508,41 @@
 
             let page = state.pages[insertIndex];
             if (!page) {
-                const frame = state.pages[0].frame;
-                page = createNewPage(frame);
-                state.pages.push(page);
-                addPageToDOM(page, insertIndex);
+                const newPage = createNewPage();
+                state.pages.push(newPage);
+                addPageToDOM(newPage, insertIndex);
+                page = newPage;
             } else {
-                // 既存ページのバブルは一旦クリア（要件に合わせる場合は適宜調整）
-                // ここでは追記ではなく貼り直しとする
+                // 追記ではなく上書き（必要なら仕様変更可）
                 page.bubbles = [];
             }
 
-            const frame = page.frame;
-            const { w: fw, h: fh } = frame;
-            const startX = frame.x + fw - 30; // 右から
-            const startY = frame.y + 30; // 上から
+            const f = page.frame;
+            const startX = f.x + f.w - 30;  // 右上
+            const startY = f.y + 30;        // 上端
             let currentX = startX, currentY = startY;
 
-            pageText.split(/\n{1}\n?/).forEach((block) => {
+            pageText.split(/\n{1}\n?/).forEach(block => {
                 const text = block.trim();
                 if (!text) return;
-                const bubble = {
+                const b = {
                     id: state.idCounter++,
                     text,
                     x: currentX,
                     y: currentY,
                     w: 120,
                     h: 120,
-                    font: state.defaultFontSize
+                    font: state.defaultFontSize,
+                    shape: 'ellipse'
                 };
-                measureBubbleSize(bubble);
-                page.bubbles.push(bubble);
+                measureBubbleSize(b);
+                page.bubbles.push(b);
 
-                // 左に連なる感じ（折り返しは簡易）
-                currentX -= (bubble.w + 18);
-                if (currentX < frame.x + 30) {
+                // 左へ連なる。足りなければ折り返して次段の右端から
+                currentX -= (b.w + 18);
+                if (currentX < f.x + 30) {
                     currentX = startX;
-                    currentY += (bubble.h + 18);
+                    currentY += (b.h + 18);
                 }
             });
 
@@ -650,33 +554,45 @@
         alert('ペースト完了');
     }
 
-    /* ---------------------------
-       保存（必要に応じてlocalStorage等へ）
-    ----------------------------*/
-    function saveAndRenderActivePage() {
-        // TODO: 必要なら保存
-        renderActivePage();
+    // ================= ページ操作/PNG =================
+    function addPageRelative(delta) {
+        const idx = state.currentPageIndex + (delta < 0 ? 0 : 1);
+        const page = createNewPage();
+        state.pages.splice(idx, 0, page);
+
+        // DOM挿入位置は末尾→今は簡略で末尾追加＋再計算でもOK（最小改修）
+        addPageToDOM(page, state.pages.length - 1);
+        setActivePage(idx);
+    }
+    function deleteCurrentPage() {
+        if (state.pages.length <= 1) return;
+        state.pages.splice(state.currentPageIndex, 1);
+        // 再描画・インデックス整備（簡略）
+        canvasContainer.innerHTML = '';
+        pageElements.length = 0;
+        state.pages.forEach((p, i) => addPageToDOM(p, i));
+        setActivePage(Math.max(0, state.currentPageIndex - 1));
+    }
+    function exportPNG() {
+        const page = state.pages[state.currentPageIndex];
+        const canvas = pageElements[state.currentPageIndex].canvas;
+        // 既存の描画をそのままPNG化（最低限）
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `page-${state.currentPageIndex + 1}.png`;
+        a.click();
     }
 
-    /* ---------------------------
-       キーボード
-    ----------------------------*/
+    // ================= キーボード =================
     document.addEventListener('keydown', (e) => {
-        const keyCode = e.code; 
-        if (keyCode === 'Escape') {
-            if (bubbleEditor.style.display === 'block') bubbleEditor.blur(); 
-            else {
-                clearSelection();
-                updateUI();
-                renderActivePage();
-            }
-        }
-        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
-        if (keyCode === 'KeyS' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setTool('serif'); }
-        if (keyCode === 'KeyK' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setTool('koma'); }
-        if (keyCode === 'KeyV' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setTool(null); }
-        if (keyCode === 'KeyC' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); exportText(); }
-        if (keyCode === 'KeyP' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); importText(); }
+        if (e.target === bubbleEditor) return;
+        if (e.code === 'KeyS') setTool('serif');
+        if (e.code === 'KeyK') setTool('koma');
+        if (e.code === 'KeyV') setTool(null);
+        if ((e.metaKey || e.ctrlKey) && e.code === 'KeyC') { e.preventDefault(); exportText(); }
+        if ((e.metaKey || e.ctrlKey) && e.code === 'KeyP') { e.preventDefault(); importText(); }
+        if ((e.metaKey || e.ctrlKey) && e.code === 'KeyN') { e.preventDefault(); exportPNG(); }
     });
 
-})();
+});
