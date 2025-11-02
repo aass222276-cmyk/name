@@ -310,3 +310,54 @@ body, html {
     top: -9999px;
     opacity: 0;
 }
+
+/* === Danger (赤) : P削除 / コマ枠リセット / セリフリセット / 全削除 === */
+#btnPageDelete,
+#btnResetPanels,
+#btnResetBubbles,
+#btnReset {
+  background: #ef4444;      /* red-500 */
+  color: #fff;
+  border: 1px solid #dc2626; /* red-600 */
+}
+#btnPageDelete:hover,
+#btnResetPanels:hover,
+#btnResetBubbles:hover,
+#btnReset:hover {
+  background: #dc2626;      /* red-600 */
+  border-color: #b91c1c;    /* red-700 */
+}
+#btnPageDelete:active,
+#btnResetPanels:active,
+#btnResetBubbles:active,
+#btnReset:active {
+  background: #b91c1c;      /* red-700 */
+}
+
+/* === Info (水色) : コピー / ペースト === */
+#btnCopyText,
+#btnPasteText {
+  background: #0ea5e9;      /* sky-500 */
+  color: #fff;
+  border: 1px solid #0284c7; /* sky-600 */
+}
+#btnCopyText:hover,
+#btnPasteText:hover {
+  background: #0284c7;      /* sky-600 */
+  border-color: #0369a1;     /* sky-700 */
+}
+#btnCopyText:active,
+#btnPasteText:active {
+  background: #0369a1;      /* sky-700 */
+}
+
+/* 好みでフォーカスリング */
+#btnPageDelete:focus,
+#btnResetPanels:focus,
+#btnResetBubbles:focus,
+#btnReset:focus,
+#btnCopyText:focus,
+#btnPasteText:focus {
+  outline: 2px solid rgba(2,132,199,.5);
+  outline-offset: 2px;
+}
