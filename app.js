@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- 定数 (v16) ---
-    const STORAGE_KEY = 'manganame-v16'; // [v16]
+    // --- 定数 (v15) ---
+    const STORAGE_KEY = 'manganame-v15'; // [v15]
     const B5_ASPECT_RATIO = Math.sqrt(2); 
     const PAGE_FRAME_PADDING = 15; 
     const GUTTER_H = 18; 
@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const BUBBLE_LINE_HEIGHT = 1.2; 
     const SNAP_ANGLE_THRESHOLD = 15; 
     const KOMA_TAP_THRESHOLD = 3; 
-    // const KOMA_HIT_THRESHOLD = 30; // [v16] v15(No.129)のロジックには不要
+    // const KOMA_HIT_THRESHOLD = 30; // [v15] v13(No.116)のロジックには不要
 
     // --- DOM要素 ---
     const canvasContainer = document.getElementById('canvasContainer');
@@ -26,7 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPasteText = document.getElementById('btnPasteText');
     const btnPNG = document.getElementById('btnPNG');
     const btnZIP = document.getElementById('btnZIP');
-    const btnResetPageEl = document.getElementById('btnResetPage'); // ページリセット
+    // [v15新設] リセットボタン
+    const btnResetPanels = document.getElementById('btnResetPanels'); 
+    const btnResetBubbles = document.getElementById('btnResetBubbles'); 
     const btnResetAllEl = document.getElementById('btnReset');    // 全削除
     const selectionPanelBubble = document.getElementById('selectionPanelBubble');
     const shapeEllipse = document.getElementById('shapeEllipse');
@@ -35,21 +37,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const bubbleEditor = document.getElementById('bubbleEditor');
     const textIO = document.getElementById('textIO');
     const pageIndicator = document.getElementById('pageIndicator');
-    const scrollLockBtn = document.getElementById('scrollLockBtn'); // [v16]
+    const scrollLockBtn = document.getElementById('scrollLockBtn'); // [v15新設]
 
     // --- アプリケーション状態 ---
     let state = {
-        pages: [], // [v16] { id, frame, panels: [], bubbles: [] }
+        pages: [], // [v15] { id, frame, panels: [], bubbles: [] }
         currentPageIndex: 0, 
         currentTool: null, 
         defaultFontSize: 16,
         selectedBubbleId: null,
         dpr: window.devicePixelRatio || 1,
-        isScrollLocked: false, // [v16]
+        isScrollLocked: false, // [v15新設]
     };
     
     let pageElements = []; // { wrapper: div, canvas: canvas, ctx: ctx }
-    let activePointerId = null; // [v16]
+    let activePointerId = null; // [v15] v13(No.116)のロジックに戻す
 
     // ドラッグ状態
     let isDragging = false; // コマ枠用
@@ -58,11 +60,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragCurrentX = 0, dragCurrentY = 0;
     let dragBubbleOffsetX = 0, dragBubbleOffsetY = 0; 
     
-    // [v16] スクロールロック状態（手動トグル用）
+    // [v15] スクロールロック状態（手動トグル用）
     let __scrollLocked = false;
     let __scrollLockY = 0;
 
-    // --- スクロールロック (v16: v15から変更なし) ---
+    // --- スクロールロック (v15: "手動" solution) ---
     function toggleScrollLock() {
         state.isScrollLocked = !state.isScrollLocked;
         
@@ -74,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.left = '0';
             document.body.style.right = '0';
             document.body.style.width = '100%';
+            // コンテナ自体のスクロールも止める
             canvasContainer.classList.add('scroll-locked');
             scrollLockBtn.classList.add('active');
         } else {
@@ -96,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadState();
         setupEventListeners();
         createPageDOMElements();
+        // [v15修正] resizeAllCanvas は DOM 描画後に実行
         requestAnimationFrame(() => {
             resizeAllCanvas(); 
             updateUI();
@@ -132,14 +136,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedData) {
             try {
                 const loadedData = JSON.parse(savedData);
-                // [v16] panels 方式かチェック
+                // [v15] panels 方式かチェック
                 if (loadedData.pages && loadedData.pages[0] && loadedData.pages[0].panels) {
                     state.pages = loadedData.pages || [];
                     state.currentPageIndex = loadedData.currentPageIndex || 0;
                     state.defaultFontSize = loadedData.defaultFontSize || 16;
                 } else {
-                    // [v16] v15以前のデータ(gutters)は互換性がないため、リセット
-                    throw new Error("Old data structure. Resetting.");
+                    // [v15] v14以前のデータ(gutters)は互換性がないため、リセット
+                    throw new Error("Old data structure (gutters). Resetting.");
                 }
                 
                 if (state.pages.length === 0 || state.currentPageIndex >= state.pages.length) {
@@ -156,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fontSizeValueDisplay.innerHTML = `${state.defaultFontSize}<br>px`;
     }
     
-    // [v16]
+    // [v15新設]
     function initNewState() {
         state.pages = [];
         state.pages.push(createNewPage(null)); // frameはnullで初期化
@@ -223,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             page.frame = newFrame;
             
-            // [v16] リサイズ時にパネルとフキダシの座標もスケーリング
+            // [v15] リサイズ時にパネルとフキダシの座標もスケーリング
             if (oldFrame && oldFrame.w > 0 && oldFrame.h > 0) {
                 const scaleX = newFrame.w / oldFrame.w;
                 const scaleY = newFrame.h / oldFrame.h;
@@ -238,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     b.y = newFrame.y + (b.y - oldFrame.y) * scaleY;
                 });
             } else if (page.panels.length === 0) {
-                // [v16] 起動時バグ修正：frameが計算されたら、最初のパネルを追加
+                // [v15] 起動時バグ修正：frameが計算されたら、最初のパネルを追加
                 page.panels = [createNewPanel(page.frame)];
             }
             
@@ -275,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activeElement.wrapper.classList.add('active');
         state.currentPageIndex = index;
         updatePageIndicator(); 
-        if (scrollToPage && !state.isScrollLocked) { // [v16] ロック中はスクロールしない
+        if (scrollToPage && !state.isScrollLocked) { // [v15] ロック中はスクロールしない
             activeElement.wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
@@ -307,43 +311,44 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!page.frame) return;
         const { x, y, w, h } = page.frame;
         context.strokeStyle = 'black';
-        context.lineWidth = 2; // [v16] 線の太さ
+        context.lineWidth = 2; // [v15] 線の太さ
         context.strokeRect(x, y, w, h);
     }
 
-    // [v16] コマ枠の描画ロジック (panels方式)
+    // [v15] コマ枠の描画ロジック (panels方式)
     function drawKoma(page, context, isExport = false) {
         if (!page.frame) return;
 
-        // [v16] page.panels を描画するだけ（Tの字バグの根本解決）
+        // [v15] page.panels を描画するだけ（Tの字バグの根本解決）
         page.panels.forEach(panel => {
             if (isExport) {
                 // TODO: 書き出し時のガター（白帯）描画
+                // 現状はエディタと同じ枠線のみ
                 context.strokeStyle = 'black';
-                context.lineWidth = 2; // [v16] 線の太さ
+                context.lineWidth = 2; // [v15] 線の太さ
                 context.strokeRect(panel.x, panel.y, panel.w, panel.h);
             } else {
                 // エディタ上: 黒の「実線」
                 context.strokeStyle = 'black';
-                context.lineWidth = 2; // [v16] 線の太さ
+                context.lineWidth = 2; // [v15] 線の太さ
                 context.setLineDash([]); 
                 context.strokeRect(panel.x, panel.y, panel.w, panel.h);
             }
         });
     }
 
-    // [v16] ドラッグ中の線も「現在のコマ」の範囲内「だけ」で描画
+    // [v15] ドラッグ中の線も「現在のコマ」の範囲内「だけ」で描画
     function drawDragKomaLine(context, x1, y1, x2, y2) {
         const page = getCurrentPage();
         if (!page || !page.frame) return;
         
         const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
         
-        // [v16] ドラッグ中の「現在」のコマを特定
+        // [v15] ドラッグ中の「現在」のコマを特定
         const panel = findPanelAt(page, x1, y1);
         if (!panel) return;
 
-        // [v16] パネルの矩形（bounds）でクリップ
+        // [v15] パネルの矩形（bounds）でクリップ
         const clipMinX = panel.x;
         const clipMaxX = panel.x + panel.w;
         const clipMinY = panel.y;
@@ -366,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function drawBubbles(page, context) {
-        // [v16] フキダシは page 直下
+        // [v15] フキダシは page 直下
         page.bubbles.forEach(bubble => {
             if (state.selectedBubbleId === bubble.id && bubbleEditor.style.display === 'block') {
                 return;
@@ -375,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // [v16] フキダシ描画 (右上アンカー)
+    // [v15] フキダシ描画 (右上アンカー)
     function drawSingleBubble(bubble, context) {
         const { x, y, w, h, shape, text, font } = bubble;
         context.save();
@@ -434,8 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('resize', resizeAllCanvas);
         btnSerif.addEventListener('click', () => setTool('serif'));
         btnKoma.addEventListener('click', () => setTool('koma'));
-        sliderFontSize.addEventListener('input', handleSliderChange); 
-        fontSizeValueDisplay.addEventListener('click', onChangeFontSizeByInput); // [v16]
+        sliderFontSize.addEventListener('input', handleSliderChange); // [v15]
+        fontSizeValueDisplay.addEventListener('click', onChangeFontSizeByInput); // [v15新設]
         btnPageAddBefore.addEventListener('click', () => addPage(true));
         btnPageAddAfter.addEventListener('click', () => addPage(false));
         btnPageDelete.addEventListener('click', deletePage);
@@ -443,8 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
         btnPasteText.addEventListener('click', importText);
         btnPNG.addEventListener('click', exportPNG);
         btnZIP.addEventListener('click', exportZIP);
-        btnResetPanels.addEventListener('click', resetCurrentPagePanels); // [v16]
-        btnResetBubbles.addEventListener('click', resetCurrentPageBubbles); // [v16]
+        btnResetPanels.addEventListener('click', resetCurrentPagePanels); // [v15新設]
+        btnResetBubbles.addEventListener('click', resetCurrentPageBubbles); // [v15新設]
         btnResetAllEl.addEventListener('click', resetAllData); 
         shapeEllipse.addEventListener('click', () => setBubbleShape('ellipse'));
         shapeRect.addEventListener('click', () => setBubbleShape('rect'));
@@ -454,16 +459,16 @@ document.addEventListener('DOMContentLoaded', () => {
         bubbleEditor.addEventListener('keydown', onBubbleEditorKeyDown);
         window.addEventListener('keydown', onKeyDown);
         
-        // [v16新設] スクロールロックボタン
+        // [v15新設] スクロールロックボタン
         scrollLockBtn.addEventListener('click', toggleScrollLock);
     }
     
-    // [v16] キャンバス毎のイベントリスナー (passive: false)
+    // [v15] キャンバス毎のイベントリスナー (v13(No.116)に戻す)
     function setupCanvasEventListeners(canvas) {
-        canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
+        canvas.addEventListener('pointerdown', onPointerDown);
         canvas.addEventListener('pointermove', onPointerMove, { passive: false }); 
-        canvas.addEventListener('pointerup', onPointerUp, { passive: false });
-        canvas.addEventListener('pointercancel', onPointerCancel, { passive: false }); 
+        canvas.addEventListener('pointerup', onPointerUp);
+        canvas.addEventListener('pointercancel', onPointerCancel); 
     }
     
     // ツール切り替え
@@ -488,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (page && el) renderPage(page, el.canvas);
     }
 
-    // [v16新設] フォントサイズ変更（手入力）
+    // [v15新設] フォントサイズ変更（手入力）
     function onChangeFontSizeByInput() {
         const currentSize = state.defaultFontSize;
         const newSizeStr = prompt("新しい文字サイズを入力してください (px)", currentSize);
@@ -501,13 +506,13 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFontSize(newSize);
     }
 
-    // [v16新設] フォントサイズ変更（スライダー）
+    // [v15新設] フォントサイズ変更（スライダー）
     function handleSliderChange(e) {
         const newSize = parseInt(e.target.value, 10);
         applyFontSize(newSize);
     }
 
-    // [v16新設] フォントサイズ変更（共通処理）
+    // [v15新設] フォントサイズ変更（共通処理）
     function applyFontSize(newSize) {
         state.defaultFontSize = newSize;
         sliderFontSize.value = newSize; 
@@ -517,19 +522,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedBubble) {
             selectedBubble.font = newSize;
             measureBubbleSize(selectedBubble);
-            // [v16] 入力中でもフォントサイズは即時反映
+            // v13(No.116)のロジックを維持（セリフ入力は変えない）
             if (bubbleEditor.style.display === 'block') {
                 bubbleEditor.style.fontSize = `${newSize}px`;
                 bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
-                // フォント変更時はリサイズ＆位置更新を許可
-                measureBubbleSize(selectedBubble);
-                updateBubbleEditorPosition(selectedBubble);
+                updateBubbleEditorPosition(selectedBubble); 
             }
             saveAndRenderActivePage();
         }
     }
 
-    // --- キャンバスイベント (v16: "手動" solution) ---
+    // --- キャンバスイベント (v15: "手動" solution) ---
     function getCanvasCoords(e) {
         const canvas = e.target;
         const rect = canvas.getBoundingClientRect();
@@ -543,10 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function onPointerDown(e) {
-        // [v16] 手動ロックがONなら、preventDefault()でスクロールを止める
-        if (state.isScrollLocked) e.preventDefault();
-        
-        if (activePointerId !== null) return;
+        // [v15] setPointerCapture は使わない
         
         const pageIndex = getPageIndex(e);
         setActivePage(pageIndex, false); 
@@ -558,8 +558,6 @@ document.addEventListener('DOMContentLoaded', () => {
         clearSelection();
         const panel = findPanelAt(page, x, y);
         if (!panel) return; 
-
-        activePointerId = e.pointerId;
 
         if (state.currentTool === 'serif') {
             const clickedBubble = findBubbleAt(page, panel, x, y);
@@ -573,9 +571,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (state.currentTool === 'koma') {
             isDragging = true;
+            // [v15] 手動ロックがONなら、preventDefault()でスクロールを止める
+            if (state.isScrollLocked) e.preventDefault();
             dragStartX = x; dragStartY = y;
             dragCurrentX = x; dragCurrentY = y;
-            // [v16] setPointerCapture は（手動ロックのため）不要
 
         } else {
             // 選択モード (ツールがnull)
@@ -583,9 +582,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (clickedBubble) {
                 state.selectedBubbleId = clickedBubble.id;
                 isDraggingBubble = true;
+                // [v15] 手動ロックがONなら、preventDefault()でスクロールを止める
+                if (state.isScrollLocked) e.preventDefault();
                 dragBubbleOffsetX = clickedBubble.x - x;
                 dragBubbleOffsetY = clickedBubble.y - y;
-                // [v16] setPointerCapture は（手動ロックのため）不要
             }
         }
         
@@ -594,9 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function onPointerMove(e) {
-        if (activePointerId !== null && e.pointerId !== activePointerId) return;
-        
-        // [v16] 手動ロックがON、かつドラッグ中のみ preventDefault
+        // [v15] 手動ロックがON、かつドラッグ中のみ preventDefault
         if (state.isScrollLocked && (isDragging || isDraggingBubble)) {
             e.preventDefault(); 
         } else if (!isDragging && !isDraggingBubble) {
@@ -625,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function onPointerUp(e) {
-        if (activePointerId !== null && e.pointerId !== activePointerId) return;
+        // [v15] 手動ロックがON、かつドラッグ中のみ preventDefault
         if (state.isScrollLocked && (isDragging || isDraggingBubble)) {
             e.preventDefault();
         }
@@ -640,14 +638,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // [v16] 共通のドラッグ終了処理
+        // [v15] 共通のドラッグ終了処理
         isDragging = false;
         isDraggingBubble = false;
         activePointerId = null;
     }
     
     function onPointerCancel(e) {
-        if (activePointerId !== null && e.pointerId !== activePointerId) return;
         if (state.isScrollLocked && (isDragging || isDraggingBubble)) {
             e.preventDefault();
         }
@@ -671,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderActivePage();
             }
         }
-        // [v16新設] 'L' キーでスクロールロック
+        // [v15新設] 'L' キーでスクロールロック
         if (keyCode === 'KeyL' && e.target.tagName !== 'TEXTAREA') {
             toggleScrollLock();
         }
@@ -686,21 +683,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return state.pages[state.currentPageIndex] || null;
     }
 
-    // [v16]
+    // [v15]
     function createNewPage(frame) {
         const id = `page_${Date.now()}`;
         const initialPanel = frame ? createNewPanel(frame) : null;
         return { 
             id: id, 
             frame: frame, 
-            panels: initialPanel ? [initialPanel] : [], // [v16]
-            bubbles: [] // [v16] bubbles は page 直下
+            panels: initialPanel ? [initialPanel] : [], // [v15]
+            bubbles: [] // [v15] bubbles は page 直下
         };
     }
     
-    // [v16]
+    // [v15]
     function createNewPanel(frame) {
-        // [v16] frameがnullの場合の安全策
+        // [v15] frameがnullの場合の安全策
         if (!frame) frame = { x: 0, y: 0, w: 100, h: 100 };
         return {
             id: `panel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -725,8 +722,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function deletePage() {
         if (state.pages.length <= 1) {
-            resetCurrentPagePanels(); // [v16] 最後の1ページは「コマ枠」
-            resetCurrentPageBubbles(); // と「セリフ」をリセット
+            // [v15] 最後の1ページは「全リセット」と同じ
+            resetCurrentPagePanels();
+            resetCurrentPageBubbles();
             return;
         }
         const deleteIndex = state.currentPageIndex;
@@ -747,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePageIndicator(); 
     }
     
-    // [v16新設] コマ枠リセット
+    // [v15新設] コマ枠リセット
     function resetCurrentPagePanels() {
         const page = getCurrentPage();
         if (page) {
@@ -757,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // [v16新設] セリフリセット
+    // [v15新設] セリフリセット
     function resetCurrentPageBubbles() {
         const page = getCurrentPage();
         if (page) {
@@ -780,12 +778,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!page) return null; 
         const bubble = {
             id: `bubble_${Date.now()}`,
-            x: x, y: y, // [v16] (x, y) は「右上」
+            x: x, y: y, // [v15] (x, y) は「右上」
             w: 100, h: 50, 
-            text: "", // [v16修正] "セリフ" -> "" (空)
+            text: "", // [v15] "セリフ" -> "" (空)
             shape: 'ellipse',
             font: state.defaultFontSize,
-            panelId: panel.id // [v16] 属するパネルを記録
+            panelId: panel.id // [v15] 属するパネルを記録
         };
         measureBubbleSize(bubble); 
         page.bubbles.push(bubble);
@@ -794,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function findBubbleAt(page, panel, x, y) {
         if (!page) return null;
-        // [v16] page直下のbubblesを検索
+        // [v15] page直下のbubblesを検索
         for (let i = page.bubbles.length - 1; i >= 0; i--) {
             const b = page.bubbles[i];
             if (x >= b.x - b.w && x <= b.x && y >= b.y && y <= b.y + b.h) {
@@ -820,36 +818,31 @@ document.addEventListener('DOMContentLoaded', () => {
         renderActivePage();
     }
     
-    // [v16修正] v13.1(No.121)の「transform」方式に修正
-    function updateBubbleEditorPosition(bubble) {
-        const canvas = pageElements[state.currentPageIndex].canvas;
+function updateBubbleEditorPosition(bubble) {
+  const canvas = pageElements[state.currentPageIndex].canvas;
+  const canvasRect = canvas.getBoundingClientRect();
+  const containerScrollTop = canvasContainer.scrollTop;
 
-        // [v16] 縦書きtextareaの「幅」は text-height, 「高さ」は text-width
-        // (v15(No.129)で間違っていた「w/hが逆」のバグを修正)
-        const editorWidth = bubble.h; // CSS width (vertical size) is text height
-        const editorHeight = bubble.w; // CSS height (horizontal size) is text width
-        
-        bubbleEditor.style.width = `${editorWidth}px`;
-        bubbleEditor.style.height = `${editorHeight}px`;
+- const editorWidth  = bubble.h; // CSS width (vertical size) is text height
+- const editorHeight = bubble.w; // CSS height (horizontal size) is text width
++ // 縦書き（vertical-rl）では、横幅=列数（＝bubble.w）、高さ=各列の縦合計（＝bubble.h）
++ const editorWidth  = bubble.w;
++ const editorHeight = bubble.h;
 
-        // [v16] (x, y) は「右上」アンカー
-        // コンテナ(#canvasContainer)基準の left/top を算出し、transformで配置
-        // (v13.1(No.121)の「ズレない」ロジックを移植)
-        const baseLeft = canvas.offsetLeft + (bubble.x - bubble.w);
-        const baseTop  = canvas.offsetTop + bubble.y;
+  bubbleEditor.style.width  = `${editorWidth}px`;
+  bubbleEditor.style.height = `${editorHeight}px`;
 
-        // left/top は 0 に固定し、transform で移動（スクロールやアドレスバー変動の影響を受けにくい）
-        bubbleEditor.style.left = '0px';
-        bubbleEditor.style.top = '0px';
-        bubbleEditor.style.transform = `translate(${baseLeft}px, ${baseTop}px)`;
-    }
+  bubbleEditor.style.left = `${canvasRect.left + bubble.x - bubble.w}px`;
+  bubbleEditor.style.top  = `${canvasRect.top + containerScrollTop + bubble.y}px`;
+}
+
 
     function hideBubbleEditor() {
         if (bubbleEditor.style.display === 'block') {
             bubbleEditor.style.display = 'none';
             const bubble = getSelectedBubble();
             if (bubble) {
-                // [v16修正] 入力確定（blur）時にリサイズ
+                // [v15] v13(No.116)のロジック（blur時にリサイズ）
                 measureBubbleSize(bubble); 
                 if (bubble.text.trim() === "") {
                     deleteSelectedBubble(); 
@@ -861,14 +854,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // [v16修正] セリフ入力バグ修正 (リサイズを復活)
+    // [v15修正] v13(No.116)の「入力限界」バグのあるロジックに差し戻し
     function onBubbleEditorInput(e) {
         const bubble = getSelectedBubble();
         if (bubble) {
             bubble.text = e.target.value;
-            // [v16] 入力中も即リサイズ＆エディタ位置更新
-            measureBubbleSize(bubble);
-            updateBubbleEditorPosition(bubble);
+            // [v15] v13(No.116)の「リサイズしない」ロジック（入力限界バグが再発する）
+            // measureBubbleSize(bubble);
+            // updateBubbleEditorPosition(bubble);
         }
     }
     
@@ -885,7 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const height = line.length * charHeight;
             if (height > maxHeight) maxHeight = height;
         });
-        if (maxHeight === 0) { // [v16修正] 空白でも最低サイズを確保
+        if (maxHeight === 0) { 
              maxHeight = font;
         }
         const totalWidth = lines.length * columnWidth;
@@ -916,9 +909,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- コマ割りロジック (v16: v15から変更なし) ---
+    // --- コマ割りロジック (v15) ---
+    // [v15] v13(No.116)の panels 方式を維持
 
-    // [v16] (x, y) が含まれる「パネル（コマ）」を返す
+    // [v15] (x, y) が含まれる「パネル（コマ）」を返す
     function findPanelAt(page, x, y) {
         if (!page || !page.panels) return null;
         // 逆順で（＝新しく作られた、より小さいパネルを）先に検索
@@ -931,8 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-
-    // [v16] タップ（水平線）判定 + 斜め線は強制スナップ
+    // [v15] タップ（水平線）判定 + 斜め線は強制スナップ
     function getKomaSnapDirection(x1, y1, x2, y2) {
         const dx = x2 - x1;
         const dy = y2 - y1;
@@ -947,61 +940,48 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (Math.abs(angle - 90) <= SNAP_ANGLE_THRESHOLD || Math.abs(angle + 90) <= SNAP_ANGLE_THRESHOLD) {
             dir = 'v'; pos = x1; 
         } else {
-            // [v16] 斜め線は強制スナップ
+            // [v15] 斜め線は強制スナップ
             dir = (Math.abs(dx) > Math.abs(dy)) ? 'h' : 'v';
             pos = (dir === 'h') ? y1 : x1;
         }
         return { dir, pos };
     }
 
-    // [v16]
+    // [v15]
     function addKomaLine(x1, y1, x2, y2) {
         const page = getCurrentPage();
         if (!page) return;
-        
-        // 1. どのパネルをクリックしたか特定
         const panel = findPanelAt(page, x1, y1);
         if (!panel) return;
-        
-        // 2. 線の向きと位置を決定
         const { dir, pos } = getKomaSnapDirection(x1, y1, x2, y2);
-        
-        // 3. パネルを分割
         splitPanel(page, panel.id, dir, pos);
     }
     
-    // [v16] パネル分割（Tの字バグの根本解決）
+    // [v15] パネル分割（Tの字バグの根本解決）
     function splitPanel(page, panelId, dir, pos) {
         const panelIndex = page.panels.findIndex(p => p.id === panelId);
         if (panelIndex === -1) return;
         
         const p = page.panels[panelIndex];
-        
-        // パネルを2つに分割
         let panelA_bounds, panelB_bounds;
         
         if (dir === 'h') {
             const halfGutter = GUTTER_H / 2;
-            // ガターがパネル内に収まるようclamp
             const y1 = Math.max(p.y, pos - halfGutter);
             const y2 = Math.min(p.y + p.h, pos + halfGutter);
-            
             panelA_bounds = { x: p.x, y: p.y, w: p.w, h: y1 - p.y };
             panelB_bounds = { x: p.x, y: y2, w: p.w, h: (p.y + p.h) - y2 };
         } else { // dir === 'v'
             const halfGutter = GUTTER_V / 2;
             const x1 = Math.max(p.x, pos - halfGutter);
             const x2 = Math.min(p.x + p.w, pos + halfGutter);
-            
             panelA_bounds = { x: p.x, y: p.y, w: x1 - p.x, h: p.h };
             panelB_bounds = { x: x2, y: p.y, w: (p.x + p.w) - x2, h: p.h };
         }
         
-        // 4. 古いパネルを削除
         page.panels.splice(panelIndex, 1);
         
-        // 5. 新しい2つのパネルを追加
-        if (panelA_bounds.w > 1 && panelA_bounds.h > 1) { // 小さすぎるパネルは作らない
+        if (panelA_bounds.w > 1 && panelA_bounds.h > 1) { 
             page.panels.push(createNewPanel(panelA_bounds));
         }
         if (panelB_bounds.w > 1 && panelB_bounds.h > 1) {
@@ -1009,10 +989,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-    // --- [v16] テキストコピー（コマ順ソート） ---
+    // --- [v15] テキストコピー（コマ順ソート） ---
     
-    // [v16] findPanelsは、単にソート済みのpanelsを返すだけ
+    // [v15] findPanelsは、単にソート済みのpanelsを返すだけ
     function findPanels(page) {
         if (!page.panels) return [];
         // コマを漫画の読み順（上→下、右→左）でソート
@@ -1022,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // [v16] コマ内のフキダシをソート（右優先→上優先）
+    // [v15] コマ内のフキダシをソート（右優先→上優先）
     function sortBubblesInPanel(bubbles) {
         return bubbles.sort((a, b) => {
             if (Math.abs(a.x - b.x) < 10) return a.y - b.y; 
@@ -1030,14 +1009,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // [v16修正] exportText（「コピー抜け」バグ修正）
+    // [v15修正] exportText（「コピー抜け」バグ修正）
     function exportText() {
         let output = "";
         state.pages.forEach((page, pageIndex) => {
             const panels = findPanels(page);
             let bubbles = [...page.bubbles];
             
-            // [v16] "コピー抜け" バグ修正（No.121/125）
+            // [v15] "コピー抜け" バグ修正（No.121/125）
             const buckets = panels.map(() => []);
             let remaining = [];
             for (const b of bubbles) {
@@ -1093,11 +1072,11 @@ document.addEventListener('DOMContentLoaded', () => {
         textIO.style.display = 'none';
     }
 
-    // [v16修正] importText（`prompt`バグ修正）
+    // [v15修正] importText（`prompt`バグ修正）
     async function importText() {
         let text = "";
         try {
-            // [v16] クリップボードから自動読み取り
+            // [v15] クリップボードから自動読み取り
             text = await navigator.clipboard.readText();
             if (!text) {
                 alert('クリップボードが空です');
@@ -1116,7 +1095,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let page;
             if (insertIndex < state.pages.length) {
                 page = state.pages[insertIndex];
-                // [v16] ページリセット
+                // [v15] ページリセット
                 page.panels = [createNewPanel(page.frame)];
                 page.bubbles = [];
             } else {
@@ -1153,7 +1132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
     }
     
-    // [v16新設] parseTextImport (v13(No.116)で抜けていた)
+    // [v15新設] parseTextImport (v13(No.116)で抜けていた)
     function parseTextImport(text) {
         const cleanedText = text.replace(/\r/g, '');
         const pageStrings = cleanedText.split(/\n{3,}/);
@@ -1181,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         offCtx.fillStyle = 'white';
         offCtx.fillRect(0, 0, offCanvas.width / scaleX / renderDPR, offCanvas.height / scaleY / renderDPR);
         drawPageFrame(page, offCtx);
-        drawKoma(page, offCtx, true); // [v16] 修正された描画ロジックで書き出し
+        drawKoma(page, offCtx, true); // [v15] 修正された描画ロジックで書き出し
         page.bubbles.forEach(bubble => {
             drawSingleBubble(bubble, offCtx); 
         });
@@ -1189,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return offCanvas;
     }
 
-    // [v16] PNG書き出し (Web Share API)
+    // [v15] PNG書き出し (Web Share API)
     async function exportPNG() {
         const page = getCurrentPage();
         if (!page) return;
@@ -1241,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const url = URL.createObjectURL(content);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'manganame_v16.zip';
+                a.download = 'manganame_v15.zip';
                 a.click();
                 URL.revokeObjectURL(url);
             });
