@@ -820,25 +820,24 @@ document.addEventListener('DOMContentLoaded', () => {
     
 function updateBubbleEditorPosition(bubble) {
   const canvas = pageElements[state.currentPageIndex].canvas;
-  const rect = canvas.getBoundingClientRect();
+  const r = canvas.getBoundingClientRect();
   const scrollY = canvasContainer.scrollTop;
 
-  // vertical-rl：横幅=列数ぶん（w）、高さ=各列の合計（h）
-  const editorWidth  = bubble.w;
-  const editorHeight = bubble.h;
+  const w = bubble.w; // 物理の横幅（列の合計）
+  const h = bubble.h; // 物理の縦幅（1列の長さ）
 
-  bubbleEditor.style.width  = `${editorWidth}px`;
-  bubbleEditor.style.height = `${editorHeight}px`;
+  bubbleEditor.style.width  = `${w}px`;
+  bubbleEditor.style.height = `${h}px`;
 
-  // v15はtransformで配置（CSSもそうなっている）
-  const left = rect.left + bubble.x - editorWidth; // 右上起点なので x - w
-  const top  = rect.top + scrollY + bubble.y;      // y
+  const left = r.left + bubble.x - w;   // 右上アンカー
+  const top  = r.top  + scrollY + bubble.y;
+
   bubbleEditor.style.transform = `translate(${left}px, ${top}px)`;
-
-  // 念のため：left/topは常に0に固定（CSSと一致させる）
   bubbleEditor.style.left = '0px';
   bubbleEditor.style.top  = '0px';
 }
+
+
 
 
     function hideBubbleEditor() {
@@ -859,15 +858,14 @@ function updateBubbleEditorPosition(bubble) {
     }
 
     // [v15修正] v13(No.116)の「入力限界」バグのあるロジックに差し戻し
-    function onBubbleEditorInput(e) {
-        const bubble = getSelectedBubble();
-        if (bubble) {
-            bubble.text = e.target.value;
-            // [v15] v13(No.116)の「リサイズしない」ロジック（入力限界バグが再発する）
-            // measureBubbleSize(bubble);
-            // updateBubbleEditorPosition(bubble);
-        }
-    }
+function onBubbleEditorInput(e) {
+  const bubble = getSelectedBubble();
+  if (bubble) {
+    bubble.text = e.target.value;
+    measureBubbleSize(bubble);           // ←復活
+    updateBubbleEditorPosition(bubble);  // ←復活
+  }
+}
     
     function onBubbleEditorKeyDown(e) { /* Escはグローバルで処理 */ }
 
