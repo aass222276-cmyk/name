@@ -1110,115 +1110,58 @@ function onBubbleEditorInput(e) {
         textIO.style.display = 'none';
     }
 
-// [v15修正] importText（`prompt`バグ修正）
-async function importText() {
-  let text = "";
-  try {
-    // クリップボードから自動読み取り
-    text = await navigator.clipboard.readText();
-    if (!text) {
-      alert('クリップボードが空です');
-      return;
+    // [v15修正] importText（`prompt`バグ修正）
+    async function importText() {
+        let text = "";
+        try {
+            // [v15] クリップボードから自動読み取り
+            text = await navigator.clipboard.readText();
+            if (!text) {
+                alert('クリップボードが空です');
+                return;
+            }
+        } catch (e) {
+            // 権限がない、またはPCのFirefoxなど
+            text = prompt('クリップボードの読み取りに失敗しました。\nテキストをここにペーストしてください：');
+            if (text === null) return; 
+        }
+
+        const pagesData = parseTextImport(text);
+        if (pagesData.length === 0) return;
+        let insertIndex = state.currentPageIndex;
+        // ★ 重複ID防止：バブルの連番を持つ
+        let bubbleSeq = 0;
+
+        pagesData.forEach((pageContent, i) => {
+            let page;
+            if (insertIndex < state.pages.length) {
+                page = state.pages[insertIndex];
+                // [v15] ページリセット
+                page.panels = [createNewPanel(page.frame)];
+                page.bubbles = [];
+            } else {
+                const frame = state.pages[0].frame;
+                page = createNewPage(frame);
+                state.pages.push(page);
+                addPageToDOM(page, insertIndex);
+            }
+            const frame = page.frame;
+            const { w: fw, h: fh } = frame;
+
+
+
+
+            const startX = frame.x + fw - 30; // 右から
+            const startY = frame.y + 30; // 上から
+            let currentX = startX, currentY = startY;
+           
+            insertIndex++;
+        });
+        updatePageIndices();
+        resizeAllCanvas();
+        setActivePage(Math.min(insertIndex - 1, state.pages.length - 1), true);
+        saveState();
     }
-  } catch (e) {
-    // 権限がない等
-    text = prompt('クリップボードの読み取りに失敗しました。\nテキストをここにペーストしてください：');
-    if (text === null) return;
-  }
-
-  const pagesData = parseTextImport(text);
-  if (pagesData.length === 0) return;
-
-  // 現在ページから順に挿入
-  let insertIndex = state.currentPageIndex;
-
-  // ★ 重複ID防止の通し番号
-  let bubbleSeq = 0;
-
-  pagesData.forEach((pageContent) => {
-    let page;
-    if (insertIndex < state.pages.length) {
-      // 既存ページをリセットして再利用
-      page = state.pages[insertIndex];
-      page.panels = [createNewPanel(page.frame)];
-      page.bubbles = [];
-    } else {
-      // 新規ページを追加
-      const baseFrame = state.pages[0]?.frame || { x: 0, y: 0, w: 100, h: 100 };
-      page = createNewPage(baseFrame);
-      state.pages.push(page);
-      addPageToDOM(page, insertIndex);
-    }
-
-    const frame = page.frame;
-    const { w: fw, h: fh } = frame;
-
-    // --- 並び規則 ---
-    // ・右端（startX）から左方向へ配置
-    // ・左端（leftLimit）を越えそうなら折り返し：XをstartXに戻し、Yを一段下げる
-    const marginX = 30;   // 右/左の余白
-    const marginY = 30;   // 上の余白
-    const stepX  = 120;   // 左へ進むピッチ（列間）
-    const gapY   = 20;    // 折り返し時の段落ち間隔
-
-    const startX = frame.x + fw - marginX; // 右端始点（右上アンカーで右から置く）
-    const startY = frame.y + marginY;      // 上始点
-    const leftLimit = frame.x + marginX;   // 左許容端
-
-    let currentX = startX;
-    let currentY = startY;
-
-    pageContent.bubbles.forEach((text) => {
-      const bubble = {
-        id: `bubble_import_${Date.now()}_${bubbleSeq++}_${Math.random().toString(36).slice(2, 6)}`,
-        x: currentX,  // 右上アンカーX
-        y: currentY,  // 右上アンカーY
-        w: 0,
-        h: 0,
-        text,
-        shape: 'ellipse',
-        font: state.defaultFontSize,
-        // panelId は不要なので付与しない（幾何で判定しているため）
-      };
-
-      // 縦書きサイズを計算（w/hが入る）
-      measureBubbleSize(bubble);
-
-      // 配置
-      page.bubbles.push(bubble);
-
-      // 次の候補位置：左へ進む
-      currentX -= stepX;
-
-      // 左端を越えそうなら（右上アンカーで右→左に積むので、"currentX - bubble.w" が左端を切るかで判定）
-      if ((currentX - bubble.w) < leftLimit) {
-        // 折り返し：Xを右に戻し、Yを一段下げる
-        currentX = startX;
-        currentY += bubble.h + gapY;
-      }
-    });
-
-    insertIndex++;
-  });
-
-  // 反映（★選択状態リセットを追加）
-  state.selectedBubbleId = null;
-  updatePageIndices();
-  resizeAllCanvas();
-  setActivePage(Math.min(insertIndex - 1, state.pages.length - 1), true);
-  saveState();
-}
-
-
-
-
-  // 反映
-  updatePageIndices();
-  resizeAllCanvas();
-  setActivePage(Math.min(insertIndex - 1, state.pages.length - 1), true);
-  saveState();
-}
-
     
     // [v15新設] parseTextImport (v13(No.116)で抜けていた)
     function parseTextImport(text) {
