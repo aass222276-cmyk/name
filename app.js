@@ -802,22 +802,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-    function showBubbleEditor(bubble) {
-        hideBubbleEditor(); 
-        state.selectedBubbleId = bubble.id;
-        bubbleEditor.value = bubble.text;
-        bubbleEditor.style.display = 'block';
-        bubbleEditor.style.fontSize = `${bubble.font}px`;
-        bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
-        measureBubbleSize(bubble);
-        updateBubbleEditorPosition(bubble);
-        bubbleEditor.focus();
-        if (bubble.text) {
-            bubbleEditor.select();
-        }
-        updateUI();
-        renderActivePage();
-    }
+   function showBubbleEditor(bubble) {
+  hideBubbleEditor();
+  state.selectedBubbleId = bubble.id;
+
+  bubbleEditor.value = bubble.text;
+  bubbleEditor.style.display = 'block';
+  bubbleEditor.style.fontSize = `${bubble.font}px`;
+  bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
+
+  // 先にサイズを最新化してから、初回の位置決めを一度だけ行う
+  measureBubbleSize(bubble);
+  updateBubbleEditorPosition(bubble);
+
+  bubbleEditor.focus();
+  if (bubble.text) {
+    bubbleEditor.select();
+  }
+
+  updateUI();
+  renderActivePage();
+}
+
     
     // [v15修正] v13(No.116)の「ズレる」ロジックに差し戻し
     function updateBubbleEditorPosition(bubble) {
@@ -859,18 +865,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // [v15修正] v13(No.116)の「入力限界」バグのあるロジックに差し戻し
-    function onBubbleEditorInput(e) {
-        const bubble = getSelectedBubble();
-        if (bubble) {
-            bubble.text = e.target.value;
-            // 入力に合わせて即リサイズ＆エディタ位置を更新
-            measureBubbleSize(bubble);
-            updateBubbleEditorPosition(bubble);
-            saveAndRenderActivePage();
+function onBubbleEditorInput(e) {
+  const bubble = getSelectedBubble();
+  if (!bubble) return;
 
-        }
-    }
-    
+  bubble.text = e.target.value;
+
+  // 入力に合わせてサイズだけ更新（位置は動かさない）
+  measureBubbleSize(bubble);
+
+  // 縦書きレイアウトのため width⇄height 反転
+  bubbleEditor.style.width  = `${bubble.h}px`;
+  bubbleEditor.style.height = `${bubble.w}px`;
+
+  // キャンバスも即時反映
+  saveAndRenderActivePage();
+}
+
     function onBubbleEditorKeyDown(e) { /* Escはグローバルで処理 */ }
 
     // 縦書き用のサイズ測定

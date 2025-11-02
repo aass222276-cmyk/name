@@ -1,6 +1,6 @@
 // Service Worker (sw.js)
 
-const SW_VERSION = 'manganame-v15.0.1'; // [v15] このバージョン番号の更新が必須です
+const SW_VERSION = 'manganame-v15.0.2'; // [v15] このバージョン番号の更新が必須です
 const CACHE_NAME = `manganame-cache-${SW_VERSION}`;
 
 // キャッシュする主要アセット
