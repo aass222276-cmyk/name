@@ -1,6 +1,6 @@
 // Service Worker (sw.js)
 
-const SW_VERSION = 'manganame-v14.0.0'; // [v14] このバージョン番号の更新が必須です
+const SW_VERSION = 'manganame-v14.0.1'; // [v13] このバージョン番号の更新が必須です
 const CACHE_NAME = `manganame-cache-${SW_VERSION}`;
 
 // キャッシュする主要アセット
@@ -41,7 +41,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
-                    // [v14] v13以前のキャッシュをすべて削除
+                    // [v13] v12以前のキャッシュをすべて削除
                     if (cacheName !== CACHE_NAME && cacheName.startsWith('manganame-cache-')) {
                         console.log('Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
