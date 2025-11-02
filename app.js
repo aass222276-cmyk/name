@@ -820,18 +820,24 @@ document.addEventListener('DOMContentLoaded', () => {
     
 function updateBubbleEditorPosition(bubble) {
   const canvas = pageElements[state.currentPageIndex].canvas;
-  const canvasRect = canvas.getBoundingClientRect();
-  const containerScrollTop = canvasContainer.scrollTop;
+  const rect = canvas.getBoundingClientRect();
+  const scrollY = canvasContainer.scrollTop;
 
-  // 縦書き（vertical-rl）：横幅＝列数（bubble.w）、高さ＝各列の合計（bubble.h）
+  // vertical-rl：横幅=列数ぶん（w）、高さ=各列の合計（h）
   const editorWidth  = bubble.w;
   const editorHeight = bubble.h;
 
   bubbleEditor.style.width  = `${editorWidth}px`;
   bubbleEditor.style.height = `${editorHeight}px`;
 
-  bubbleEditor.style.left = `${canvasRect.left + bubble.x - editorWidth}px`;
-  bubbleEditor.style.top  = `${canvasRect.top + containerScrollTop + bubble.y}px`;
+  // v15はtransformで配置（CSSもそうなっている）
+  const left = rect.left + bubble.x - editorWidth; // 右上起点なので x - w
+  const top  = rect.top + scrollY + bubble.y;      // y
+  bubbleEditor.style.transform = `translate(${left}px, ${top}px)`;
+
+  // 念のため：left/topは常に0に固定（CSSと一致させる）
+  bubbleEditor.style.left = '0px';
+  bubbleEditor.style.top  = '0px';
 }
 
 
