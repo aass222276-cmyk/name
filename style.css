@@ -311,45 +311,31 @@ body, html {
     opacity: 0;
 }
 
-/* 強いセレクタで上書き：#toolbar #id（必要なら !important） */
-
-/* 赤：P削除 / コマ枠リセット / セリフリセット / 全削除 */
-#toolbar #btnPageDelete,
+/* 落ち着いた暗赤（少し赤寄り） */
 #toolbar #btnResetPanels,
+#toolbar #btnPageDelete,
 #toolbar #btnResetBubbles,
 #toolbar #btnReset {
-  background: #ef4444 !important;
+  background: #5c1f1f !important;   /* base */
   color: #fff !important;
-  border: 1px solid #dc2626 !important;
+  border: 1px solid #3a1414 !important;
 }
-#toolbar #btnPageDelete:hover,
 #toolbar #btnResetPanels:hover,
+#toolbar #btnPageDelete:hover,
 #toolbar #btnResetBubbles:hover,
 #toolbar #btnReset:hover {
-  background: #dc2626 !important;
-  border-color: #b91c1c !important;
+  background: #772222 !important;   /* hover */
+  border-color: #2c0f0f !important;
 }
-/* active状態（.active）も上書き */
-#toolbar #btnPageDelete.active,
+#toolbar #btnResetPanels:active,
+#toolbar #btnPageDelete:active,
+#toolbar #btnResetBubbles:active,
+#toolbar #btnReset:active,
 #toolbar #btnResetPanels.active,
+#toolbar #btnPageDelete.active,
 #toolbar #btnResetBubbles.active,
 #toolbar #btnReset.active {
-  background: #b91c1c !important;
+  background: #8b2a2a !important;   /* active */
+  border-color: #3a1414 !important;
 }
 
-/* 水色：コピー / ペースト */
-#toolbar #btnCopyText,
-#toolbar #btnPasteText {
-  background: #0ea5e9 !important;
-  color: #fff !important;
-  border: 1px solid #0284c7 !important;
-}
-#toolbar #btnCopyText:hover,
-#toolbar #btnPasteText:hover {
-  background: #0284c7 !important;
-  border-color: #0369a1 !important;
-}
-#toolbar #btnCopyText.active,
-#toolbar #btnPasteText.active {
-  background: #0369a1 !important;
-}
