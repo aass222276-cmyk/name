@@ -802,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
     }
 
-   function showBubbleEditor(bubble) {
+function showBubbleEditor(bubble) {
   hideBubbleEditor();
   state.selectedBubbleId = bubble.id;
 
@@ -811,18 +811,17 @@ document.addEventListener('DOMContentLoaded', () => {
   bubbleEditor.style.fontSize = `${bubble.font}px`;
   bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
 
-  // 先にサイズを最新化してから、初回の位置決めを一度だけ行う
+  // 先にサイズを確定してから位置決め
   measureBubbleSize(bubble);
   updateBubbleEditorPosition(bubble);
 
   bubbleEditor.focus();
-  if (bubble.text) {
-    bubbleEditor.select();
-  }
+  if (bubble.text) bubbleEditor.select();
 
   updateUI();
   renderActivePage();
 }
+
 
     
     // [v15修正] v13(No.116)の「ズレる」ロジックに差し戻し
@@ -873,14 +872,12 @@ function onBubbleEditorInput(e) {
 
   // 入力に合わせてサイズだけ更新（位置は動かさない）
   measureBubbleSize(bubble);
-
-  // 縦書きレイアウトのため width⇄height 反転
-  bubbleEditor.style.width  = `${bubble.h}px`;
+  bubbleEditor.style.width  = `${bubble.h}px`; // 縦書きなので width⇄height 反転
   bubbleEditor.style.height = `${bubble.w}px`;
 
-  // キャンバスも即時反映
   saveAndRenderActivePage();
 }
+
 
     function onBubbleEditorKeyDown(e) { /* Escはグローバルで処理 */ }
 
