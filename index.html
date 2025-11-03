@@ -32,20 +32,17 @@
 
     <div id="toolbar">
         
+        <button id="btnPageDelete" title="ページ削除">P<br>削<br>除</button>
+        <div class="separator"></div>
         <button id="btnPageAddBefore" title="前にページ追加">↑<br>追<br>加</button>
         <button id="btnPageAddAfter" title="後にページ追加">追<br>加<br>↓</button>
-        <button id="btnPageDelete" title="ページ削除">P<br>削<br>除</button>
 
         <div class="separator"></div>
 
         <button id="btnSerif" class="tool-toggle" title="セリフ (S)">セ<br>リ<br>フ</button>
         <button id="btnKoma" class="tool-toggle" title="コマ枠 (K)">コ<br>マ<br>割</button>
-        
-        <div class="separator"></div>
 
-        <input type="range" id="sliderFontSize" min="10" max="48" value="16" title="文字サイズ">
-        <div id="fontSizeValueDisplay">16<br>px</div>
-
+        <button id="btnDraw" class="tool-toggle" title="描画 (D)">描<br>画</button>
         <div class="separator"></div>
 
         <button id="btnCopyText" title="テキストコピー">コ<br>ピ<br>ー</button>
@@ -61,6 +58,15 @@
         <button id="btnReset" title="全リセット">全<br>削<br>除</button>
     </div>
 
+    <div id="fontSliderPanel">
+        <input type="range" id="sliderFontSize" min="10" max="48" value="16" title="文字サイズ">
+        <div id="fontSizeValueDisplay">16px</div>
+    </div>
+    
+    <div id="lineWidthSliderPanel">
+        <input type="range" id="sliderLineWidth" min="1" max="50" value="5" title="線の太さ">
+        <div id="lineWidthValueDisplay">5px</div>
+    </div>
     <div id="canvasContainer">
         </div>
 
@@ -73,7 +79,9 @@
         <div id="toolResetPanel" class="selection-panel">
             <button id="btnResetPanels" class="delete" title="このページのコマ枠をリセット">コマ割り<br>ページ<br>リセット</button>
             <button id="btnResetBubbles" class="delete" title="このページのセリフをリセット">セリフ<br>ページ<br>リセット</button>
-        </div>
+            
+            <button id="btnResetDrawing" class="delete" title="このページの描画をリセット">描画<br>ページ<br>リセット</button>
+            </div>
 
         <div id="selectionPanelBubble" class="selection-panel">
             <button id="deleteBubble" class="delete vertical-btn">削除</button>
@@ -82,7 +90,11 @@
             <button id="shapeNone" class="vertical-btn">枠無</button> 
         </div>
 
-    </div>
+        <div id="selectionPanelDraw" class="selection-panel">
+            <button id="btnPen" class="vertical-btn active">ペン</button>
+            <button id="btnEraser" class="vertical-btn">消しゴム</button>
+        </div>
+        </div>
 
     <div id="pageIndicator">1 / 1</div>
 

@@ -26,7 +26,6 @@ body, html {
 
 /* --- ツールバー (v15 縦長・固定) --- */
 #toolbar {
-    /* [v15] 画面上部に固定 */
     position: fixed;
     top: 0;
     left: 0;
@@ -49,7 +48,6 @@ body, html {
 #toolbar::-webkit-scrollbar-track { background: #444; }
 #toolbar::-webkit-scrollbar-thumb { background-color: #888; border-radius: 3px; }
 
-/* [v15] 縦長・縦書きボタン対応 */
 #toolbar button {
     background: #666;
     border: 1px solid #888;
@@ -74,11 +72,16 @@ body, html {
 #toolbar button:hover { background: #777; }
 #toolbar button.active { background: #007bff; border-color: #0056b3; }
 
-/* [v15] 4文字ボタン（ペースト） */
 #toolbar button.btn-4char {
     font-size: 0.7rem; 
     line-height: 1.1;  
 }
+
+/* ======[修正箇所 (描画ボタン幅)]====== */
+#toolbar #btnDraw {
+    min-width: 38px; /* 描画ボタンは少し幅広に */
+}
+/* ======[修正ここまで]====== */
 
 #toolbar .separator {
     width: 1px;
@@ -95,34 +98,6 @@ body, html {
     margin-right: 4px;
 }
 
-/* フォントスライダー（例外） */
-#sliderFontSize {
-    width: 60px; 
-    flex-shrink: 0;
-    height: auto; 
-}
-/* [v15] px表示部（div） */
-#fontSizeValueDisplay {
-    background: #666;
-    border: 1px solid #888;
-    color: white;
-    padding: 4px 2px;
-    border-radius: 4px;
-    font-weight: bold;
-    flex-shrink: 0;
-    white-space: normal;
-    line-height: 1.25;
-    font-size: 0.8rem;
-    height: calc(var(--toolbar-height) - 16px);
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    min-width: 28px;
-}
-
 /* [v15修正] 新しいリセットボタンのスタイル */
 #btnReset, #btnResetPage, #btnResetPanels, #btnResetBubbles {
     background: #a00;
@@ -132,52 +107,152 @@ body, html {
 }
 
 
-/* --- [v15] キャンバス領域 --- */
+/* --- ツールバー下 パネル (フォント / 線幅) --- */
+#fontSliderPanel,
+#lineWidthSliderPanel { /* [修正] 線幅パネルも共通スタイル */
+    display: none; 
+    position: fixed;
+    top: var(--toolbar-height); 
+    left: 0;
+    right: 0;
+    background-color: #3a3a3a; 
+    padding: 8px 10px;
+    z-index: 99; 
+    align-items: center;
+    justify-content: center; /* [修正済] 中央揃え */
+    gap: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    height: 40px; 
+    box-sizing: border-box;
+}
+#fontSliderPanel.show,
+#lineWidthSliderPanel.show { /* [修正] 表示クラス */
+    display: flex; 
+}
+
+/* フォントスライダー */
+#fontSliderPanel #sliderFontSize {
+    width: 180px; /* [修正済] 1.2倍 */
+    flex-shrink: 0;
+}
+#fontSliderPanel #fontSizeValueDisplay {
+    background: #666;
+    border: 1px solid #888;
+    color: white;
+    padding: 4px 6px; 
+    border-radius: 4px;
+    font-weight: bold;
+    flex-shrink: 0;
+    white-space: nowrap; /* [修正済] 横書き */
+    font-size: 0.8rem;
+    height: calc(100% - 8px); 
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 32px; 
+    cursor: pointer; 
+}
+
+/* ======[修正箇所 (線幅スライダー)]====== */
+/* 線幅スライダー */
+#lineWidthSliderPanel #sliderLineWidth {
+    width: 180px; 
+    flex-shrink: 0;
+}
+#lineWidthSliderPanel #lineWidthValueDisplay {
+    background: #666;
+    border: 1px solid #888;
+    color: white;
+    padding: 4px 6px; 
+    border-radius: 4px;
+    font-weight: bold;
+    flex-shrink: 0;
+    white-space: nowrap; 
+    font-size: 0.8rem;
+    height: calc(100% - 8px); 
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 32px; 
+    cursor: pointer;
+}
+/* ======[修正ここまで]====== */
+
+
+/* --- キャンバス領域 --- */
 #canvasContainer {
     flex-grow: 1;
     overflow-y: auto; 
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch; 
     background-color: #2a2a2a;
-    /* [v15] ツールバーに隠れないよう、上部を押し下げる */
     padding: calc(var(--toolbar-height) + var(--page-gap)) 10px var(--page-gap) 10px;
     box-sizing: border-box;
     position: relative; 
 }
 
-/* [v15新設] スクロール停止（手動トグル） */
 #canvasContainer.scroll-locked {
     overflow-y: hidden;
     touch-action: none;
     overscroll-behavior: contain;
 }
 
-/* ページラッパー */
+/* ページラッパー (2枚のCanvasの土台) */
 .page-wrapper {
     width: 100%;
     margin-bottom: var(--page-gap); 
     box-sizing: border-box;
+    /* ======[修正箇所 (Canvasを重ねる土台)]====== */
+    position: relative; /* 重ね合わせの基準 */
+    aspect-ratio: calc(1 / var(--b5-ratio)); /* ラッパー自体がB5の比率を持つ */
+    /* ======[修正ここまで]====== */
 }
 
 /* アクティブページのハイライト */
-.page-wrapper.active .mainCanvas {
+.page-wrapper.active .mainCanvas { /* [修正] mainCanvas にハイライト */
     outline: 3px solid #007bff;
     box-shadow: 0 0 15px rgba(0,123,255,0.7);
 }
 
-/* [v15] canvasのスタイル */
+/* ======[修正箇所 (Canvas 2枚重ね)]====== */
+/* 2枚のCanvasに共通のスタイル */
+.drawingCanvas,
 .mainCanvas {
     width: 100%; 
-    height: auto; 
+    height: 100%; /* [修正] 100% (page-wrapperに合わせる) */
     display: block; 
-    background: white;
-    aspect-ratio: calc(1 / var(--b5-ratio)); 
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     cursor: default;
     
-    /* [v15] ダブルタップズーム禁止、縦スクロールは許可 */
+    /* 重ね合わせの指定 */
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* 奥: 描画レイヤー */
+.drawingCanvas {
+    background: white; /* [修正] 描画層が白い背景を持つ */
+    z-index: 1;
+    touch-action: none; /* 描画モードでスワイプさせない */
+}
+
+/* 手前: コマ枠/フキダシレイヤー */
+.mainCanvas {
+    background: transparent; /* [最重要] 透明ガターのため、透明にする */
+    z-index: 2;
     touch-action: manipulation;
 }
+
+/* タップ操作を無効化するクラス (JSが付け外し) */
+.pointer-none {
+    pointer-events: none;
+}
+/* ======[修正ここまで]====== */
+
+/* 既存のカーソル定義 (変更なし) */
 .mainCanvas.tool-serif {
     cursor: text;
 }
@@ -185,6 +260,7 @@ body, html {
     cursor: crosshair;
     touch-action: none; 
 }
+
 
 /* --- フキダシ入力エリア --- */
 #bubbleEditor {
@@ -204,47 +280,42 @@ body, html {
     line-height: 1.2; 
     scrollbar-width: thin;
     
-    /* [v15修正] transform で配置（left/top=0固定）。ズレ防止 */
     left: 0;
     top: 0;
     transform: translate(0, 0);
     will-change: transform;
-    touch-action: none; /* IME中のフリック誤作動も軽減 */
-    text-orientation: upright; /* 1字ずつ正立（カーソルの通り道が素直になる） */
-    letter-spacing: 0;         /* カーソルのズレ抑制。任意で微調整可 */
+    touch-action: none; 
+    text-orientation: mixed; /* [修正済] */
+    letter-spacing: 0;
     caret-color: #000;
-
 }
 #bubbleEditor::-webkit-scrollbar { height: 6px; }
 #bubbleEditor::-webkit-scrollbar-thumb { background-color: #888; }
 
-/* --- [修正] 画面下部UIのラッパー --- */
+/* --- 画面下部UIのラッパー --- */
 #bottomBar {
     position: fixed;
     bottom: 20px;
-    left: 20px; /* 左端の余白 */
+    left: 20px; 
     z-index: 20;
     display: flex;
     flex-wrap: nowrap;
-    /* [修正] gapは使わず、marginで個別に指定 */
-    align-items: flex-end; /* ボタンの高さを下揃え */
-    pointer-events: none; /* ラッパー自体はタップを透過 */
+    align-items: flex-end; 
+    pointer-events: none; 
 }
 #bottomBar > * {
-    pointer-events: auto; /* 子要素（ボタンやパネル）はタップ可能 */
-    flex-shrink: 0; /* 縮まない */
+    pointer-events: auto; 
+    flex-shrink: 0; 
 }
 
-/* --- [修正] 選択パネルのスタイル（位置指定を削除） --- */
+/* 選択パネルの共通スタイル */
 .selection-panel {
-    /* [修正] position, bottom, left, transform を削除 */
     background: rgba(50, 50, 50, 0.9);
     border: 1px solid #888;
     border-radius: 6px;
     padding: 5px;
     display: none;
     gap: 5px;
-    /* [修正] z-indexはbottomBarが持つので不要 */
 }
 .selection-panel.show {
     display: flex;
@@ -269,20 +340,25 @@ body, html {
     font-weight: bold;
     height: 60px; 
 }
-/* [修正] 重複していた .delete 定義を削除 */
+/* ======[修正箇所 (描画ツールのactive)]====== */
+/* 描画ツールの選択中ハイライト */
+#selectionPanelDraw button.active {
+    background: #007bff;
+    border-color: #0056b3;
+}
+/* ======[修正ここまで]====== */
 
-/* [修正] セリフコマンドに隙間を追加 */
-#selectionPanelBubble {
-    margin-left: 5px; /* リセットパネルとの隙間 */
+/* セリフコマンド */
+#selectionPanelBubble,
+#selectionPanelDraw { /* [修正] 描画パネルも同じ隙間 */
+    margin-left: 5px; 
 }
 
-/* [修正] ツールリセットパネルの位置と隙間 */
+/* ツールリセットパネル */
 #toolResetPanel {
-    order: -1; /* ロックボタンの右に来るよう、表示順を調整 */
-    margin-left: 10px; /* ロックボタンとの隙間 */
+    order: -1; 
+    margin-left: 10px; 
 }
-
-/* [修正] ツールリセットパネル内のボタンスタイル（位置指定削除） */
 #toolResetPanel button {
     display: none; /* JSで .show をつけるまで非表示 */
     writing-mode: horizontal-tb;
@@ -315,29 +391,25 @@ body, html {
     font-size: 0.9rem;
     font-weight: bold;
     z-index: 10;
-    pointer-events: none; /* タップを透過 */
+    pointer-events: none; 
 }
 
-/* [修正] ロックボタンのスタイル（縦書き・縦の四角） */
+/* ロックボタン */
 #scrollLockBtn {
-  order: -2; /* 一番左に配置 */
-
+  order: -2; 
   background: #666;
   border: 1px solid #888;
   color: white;
-
-  /* [修正] <br>タグによる強制改行（縦積み）スタイル */
-  /* writing-mode を削除 */
-  white-space: normal;      /* <br> を有効にする */
-  text-align: center;         /* テキストを中央揃え */
-  width: 36px;                /* 幅を固定 (縦長にする) */
-  height: 60px;               /* 高さを60pxに */
+  white-space: normal; 
+  text-align: center;     
+  width: 36px;            
+  height: 60px;           
   min-width: auto;        
-  padding: 8px 4px;       /* [修正] 上下パディングを調整 */
-  line-height: 1.1;       /* [修正] 行間を詰めて3行入るようにする */
+  padding: 8px 4px;     
+  line-height: 1.1;     
   font-size: 0.8rem;      
   font-weight: bold;
-  border-radius: 4px;     /* 四角 */
+  border-radius: 4px;     
   box-sizing: border-box;
 }
 #scrollLockBtn.active {
@@ -354,13 +426,14 @@ body, html {
     opacity: 0;
 }
 
-/* [修正] 赤ボタンの定義を更新 */
+/* 赤ボタンの定義 */
 #toolbar #btnPageDelete,
 #toolbar #btnReset,
 #toolResetPanel #btnResetPanels,
 #toolResetPanel #btnResetBubbles,
+#toolResetPanel #btnResetDrawing, /* [修正] 描画リセットも赤 */
 #selectionPanelBubble #deleteBubble { 
-  background: #5c1f1f !important;   /* base */
+  background: #5c1f1f !important;   
   color: #fff !important;
   border: 1px solid #3a1414 !important;
 }
@@ -368,15 +441,17 @@ body, html {
 #toolbar #btnReset:hover,
 #toolResetPanel #btnResetPanels:hover,
 #toolResetPanel #btnResetBubbles:hover,
+#toolResetPanel #btnResetDrawing:hover, /* [修正] 描画リセットも赤 */
 #selectionPanelBubble #deleteBubble:hover {
-  background: #772222 !important;   /* hover */
+  background: #772222 !important;   
   border-color: #2c0f0f !important;
 }
 #toolbar #btnPageDelete:active,
 #toolbar #btnReset:active,
 #toolResetPanel #btnResetPanels:active,
 #toolResetPanel #btnResetBubbles:active,
+#toolResetPanel #btnResetDrawing:active, /* [修正] 描画リセットも赤 */
 #selectionPanelBubble #deleteBubble:active {
-  background: #8b2a2a !important;   /* active */
+  background: #8b2a2a !important;   
   border-color: #3a1414 !important;
 }
