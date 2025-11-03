@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const GUTTER_V = 9;  
     const BUBBLE_PADDING_X = 10; 
     const BUBBLE_PADDING_Y = 8;  
+    const BUBBLE_PADDING_NONE = 2; // [新規] 枠なしの余白
     const BUBBLE_LINE_HEIGHT = 1.2; 
     const SNAP_ANGLE_THRESHOLD = 15; 
     const KOMA_TAP_THRESHOLD = 3; 
@@ -26,13 +27,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPasteText = document.getElementById('btnPasteText');
     const btnPNG = document.getElementById('btnPNG');
     const btnZIP = document.getElementById('btnZIP');
-    // [v15新設] リセットボタン
+    // [v15新設] リセットボタン (HTMLから移動してきた)
     const btnResetPanels = document.getElementById('btnResetPanels'); 
     const btnResetBubbles = document.getElementById('btnResetBubbles'); 
     const btnResetAllEl = document.getElementById('btnReset');    // 全削除
+    const toolResetPanel = document.getElementById('toolResetPanel'); // [追加] (問題1)
     const selectionPanelBubble = document.getElementById('selectionPanelBubble');
     const shapeEllipse = document.getElementById('shapeEllipse');
     const shapeRect = document.getElementById('shapeRect');
+    const shapeNone = document.getElementById('shapeNone'); // [新規]
     const deleteBubble = document.getElementById('deleteBubble');
     const bubbleEditor = document.getElementById('bubbleEditor');
     const textIO = document.getElementById('textIO');
@@ -285,15 +288,31 @@ function endAutoScrollLock(){
 
     // --- UI更新 ---
     function updateUI() {
+        // ツールバーのボタン状態
         btnSerif.classList.toggle('active', state.currentTool === 'serif');
         btnKoma.classList.toggle('active', state.currentTool === 'koma');
+        
+        // キャンバスのカーソル状態
         pageElements.forEach(el => {
             el.canvas.classList.remove('tool-serif', 'tool-koma');
             if (state.currentTool === 'serif') el.canvas.classList.add('tool-serif');
             else if (state.currentTool === 'koma') el.canvas.classList.add('tool-koma');
         });
+
+        // [修正] (問題1) ツールリセットパネルの表示制御
+        const showResetKoma = (state.currentTool === 'koma');
+        const showResetSerif = (state.currentTool === 'serif');
+        
+        btnResetPanels.classList.toggle('show', showResetKoma);
+        btnResetBubbles.classList.toggle('show', showResetSerif);
+        
+        // どちらかのボタンが表示されていれば、親パネル自体を表示
+        toolResetPanel.classList.toggle('show', showResetKoma || showResetSerif);
+
+        // [修正] (問題1) 既存のフキダシ選択パネルの表示制御
         const selectedBubble = getSelectedBubble();
         selectionPanelBubble.classList.toggle('show', !!selectedBubble);
+        
         if (!selectedBubble) hideBubbleEditor();
         updatePageIndicator(); 
     }
@@ -413,7 +432,7 @@ function endAutoScrollLock(){
         });
     }
 
-    // [v15] フキダシ描画 (右上アンカー)
+    // [修正] drawSingleBubble に「枠無」処理を追加
     function drawSingleBubble(bubble, context) {
         const { x, y, w, h, shape, text, font } = bubble;
         context.save();
@@ -424,6 +443,7 @@ function endAutoScrollLock(){
         context.beginPath();
         switch (shape) {
             case 'rect':
+            case 'none': // [新規] 枠無は四角形として描画
                 context.rect(-w, 0, w, h);
                 break;
             case 'ellipse':
@@ -433,7 +453,9 @@ function endAutoScrollLock(){
         }
         context.closePath();
         context.fill();
-        context.stroke();
+        if (shape !== 'none') { // [新規] 枠無以外の場合のみ枠線を描画
+            context.stroke();
+        }
         context.fillStyle = 'black';
         context.font = `${font}px 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif`;
         context.textAlign = 'center'; 
@@ -441,8 +463,13 @@ function endAutoScrollLock(){
         const lines = text.split('\n');
         const columnWidth = font * BUBBLE_LINE_HEIGHT; 
         const charHeight = font * BUBBLE_LINE_HEIGHT;  
-        let currentX = -BUBBLE_PADDING_X - (columnWidth / 2);
-        const startY = BUBBLE_PADDING_Y;
+        
+        // [新規] 枠無用の余白を適用
+        const paddingX = (shape === 'none') ? BUBBLE_PADDING_NONE : BUBBLE_PADDING_X;
+        const paddingY = (shape === 'none') ? BUBBLE_PADDING_NONE : BUBBLE_PADDING_Y;
+
+        let currentX = -paddingX - (columnWidth / 2);
+        const startY = paddingY;
         lines.forEach((line) => {
             let currentY = startY;
             for (let i = 0; i < line.length; i++) {
@@ -486,6 +513,7 @@ function endAutoScrollLock(){
         btnResetAllEl.addEventListener('click', resetAllData); 
         shapeEllipse.addEventListener('click', () => setBubbleShape('ellipse'));
         shapeRect.addEventListener('click', () => setBubbleShape('rect'));
+        shapeNone.addEventListener('click', () => setBubbleShape('none')); // [新規]
         deleteBubble.addEventListener('click', deleteSelectedBubble);
         bubbleEditor.addEventListener('input', onBubbleEditorInput);
         bubbleEditor.addEventListener('blur', hideBubbleEditor);
@@ -494,6 +522,34 @@ function endAutoScrollLock(){
         
         // [v15新設] スクロールロックボタン
         scrollLockBtn.addEventListener('click', toggleScrollLock);
+        
+        // [追加] (問題2) iOS/Safariのズーム防止
+        setupZoomPrevention();
+    }
+    
+    // [新規] (問題2) ズーム防止ロジック
+    function setupZoomPrevention() {
+        // ピンチズーム防止
+        document.addEventListener('touchmove', function(event) {
+            // 2本指以上（ピンチ）の場合、デフォルト動作（ズーム）をキャンセル
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        }, { passive: false }); // passive: false が必須
+
+        // ダブルタップズーム防止
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            // event.touches.length > 0 は、まだ指が残っている状態（ピンチの片方離しなど）
+            if (event.touches.length > 0) return; 
+
+            const now = (new Date()).getTime();
+            // 300ms以内の連続タップ（ダブルタップ）
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false }); // passive: false が必須
     }
     
     // [v15] キャンバス毎のイベントリスナー (v13(No.116)に戻す)
@@ -505,9 +561,33 @@ function endAutoScrollLock(){
     }
     
     // ツール切り替え
+    // [修正C] 「2案」の自動ロックを実装
     function setTool(toolName) {
-        if (state.currentTool === toolName) state.currentTool = null;
-        else state.currentTool = toolName;
+        const oldTool = state.currentTool;
+
+        if (oldTool === toolName) {
+            // ツールをOFFにする
+            state.currentTool = null;
+            // [修正C] セリフモードをOFFにする時、ロックも解除
+            if (oldTool === 'serif') {
+                endAutoScrollLock();
+            }
+        } else {
+            // ツールをONにする（または切り替える）
+            
+            // [修正C] 古いツールがセリフモードなら、まずロック解除
+            if (oldTool === 'serif') {
+                endAutoScrollLock();
+            }
+
+            state.currentTool = toolName;
+
+            // [修正C] 新しいツールがセリフモードなら、ロック
+            if (state.currentTool === 'serif') {
+                beginAutoScrollLock();
+            }
+        }
+        
         clearSelection();
         updateUI();
         renderActivePage();
@@ -557,7 +637,8 @@ function endAutoScrollLock(){
             measureBubbleSize(selectedBubble);
             // v13(No.116)のロジックを維持（セリフ入力は変えない）
             if (bubbleEditor.style.display === 'block') {
-                bubbleEditor.style.fontSize = `${newSize}px`;
+                // [修正A] ズーム対策のため、入力欄のフォントは16px固定
+                bubbleEditor.style.fontSize = '16px';
                 bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
                 updateBubbleEditorPosition(selectedBubble); 
             }
@@ -578,6 +659,7 @@ function endAutoScrollLock(){
         return parseInt(e.target.dataset.pageIndex, 10);
     }
 
+    // [修正] onPointerDown (ロック関連を削除)
     function onPointerDown(e) {
         // [v15] setPointerCapture は使わない
         
@@ -588,25 +670,34 @@ function endAutoScrollLock(){
         const page = getCurrentPage();
         if (!page) return;
 
+        // [修正B] タップ/ドラッグ判定のため、down時点で座標を記録
+        dragStartX = x; dragStartY = y;
+
         clearSelection();
         const panel = findPanelAt(page, x, y);
         if (!panel) return; 
 
         if (state.currentTool === 'serif') {
+            // [修正B-2] 当たり判定を拡大した findBubbleAt を呼ぶ
             const clickedBubble = findBubbleAt(page, panel, x, y);
             if (clickedBubble) {
+                // [修正B-1] タップで即編集せず、ドラッグ移動の準備
                 state.selectedBubbleId = clickedBubble.id;
-                showBubbleEditor(clickedBubble);
+                isDraggingBubble = true;
+                // [修正C] ロックは setTool が行うため、ここでは何もしない
+                if (state.isScrollLocked) e.preventDefault();
+                dragBubbleOffsetX = clickedBubble.x - x;
+                dragBubbleOffsetY = clickedBubble.y - y;
+
             } else {
+                // [修正B-1] 何もない場所は、従来通り即時作成＆編集
                 const newBubble = createBubble(panel, x, y);
                 state.selectedBubbleId = newBubble.id;
                 showBubbleEditor(newBubble);
             }
         } else if (state.currentTool === 'koma') {
             isDragging = true;
-            // [v15] 手動ロックがONなら、preventDefault()でスクロールを止める
             if (state.isScrollLocked) e.preventDefault();
-            dragStartX = x; dragStartY = y;
             dragCurrentX = x; dragCurrentY = y;
 
         } else {
@@ -615,8 +706,7 @@ function endAutoScrollLock(){
             if (clickedBubble) {
                 state.selectedBubbleId = clickedBubble.id;
                 isDraggingBubble = true;
-                beginAutoScrollLock();
-                // [v15] 手動ロックがONなら、preventDefault()でスクロールを止める
+                beginAutoScrollLock(); // [修正C] nullツール時は手動でロック
                 if (state.isScrollLocked) e.preventDefault();
                 dragBubbleOffsetX = clickedBubble.x - x;
                 dragBubbleOffsetY = clickedBubble.y - y;
@@ -629,6 +719,7 @@ function endAutoScrollLock(){
 
 function onPointerMove(e) {
   // セリフ（バブル）移動中は常にスクロール抑止
+  // [修正B] セリフモードでもドラッグ中はスクロール抑止
   if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
     e.preventDefault();
   } else if (!isDragging && !isDraggingBubble) {
@@ -643,7 +734,7 @@ function onPointerMove(e) {
     dragCurrentX = x;
     dragCurrentY = y;
     renderActivePage();
-  } else if (isDraggingBubble && state.currentTool === null) {
+  } else if (isDraggingBubble) { // [修正B-1] 'serif' または 'null' ツールで移動
     const bubble = getSelectedBubble();
     if (bubble) {
       bubble.x = x + dragBubbleOffsetX;
@@ -656,21 +747,41 @@ function onPointerMove(e) {
   }
 }
 
+    // [修正B/C] onPointerUp のロジックを変更
     function onPointerUp(e) {
-        // [v15] 手動ロックがON、かつドラッグ中のみ preventDefault
+        // [修正B/C] セリフモードでもドラッグ中は preventDefault
         if (isDraggingBubble || (state.isScrollLocked && isDragging)) {
             e.preventDefault();
         }
 
+        const { x, y } = getCanvasCoords(e);
+
         if (isDragging && state.currentTool === 'koma') {
-            const { x, y } = getCanvasCoords(e);
             addKomaLine(dragStartX, dragStartY, x, y);
             saveAndRenderActivePage();
+
         } else if (isDraggingBubble) {
-            if (bubbleEditor.style.display !== 'block') {
-                 saveAndRenderActivePage();
+            
+            // [修正B-1] タップかドラッグかを判定
+            const dx = x - dragStartX;
+            const dy = y - dragStartY;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < KOMA_TAP_THRESHOLD && state.currentTool === 'serif') {
+                // [修正B-1] セリフモードで「タップ」されたと判断 -> 編集開始
+                const bubble = getSelectedBubble();
+                if (bubble) showBubbleEditor(bubble);
+            } else {
+                // [修正B-1] ドラッグ終了、または null モードでのタップ
+                if (bubbleEditor.style.display !== 'block') {
+                     saveAndRenderActivePage();
+                }
             }
-            endAutoScrollLock();
+
+            // [修正C] 'null' モードのドラッグが終了したのでロック解除
+            if (state.currentTool === null) {
+                endAutoScrollLock();
+            }
         }
         
         // [v15] 共通のドラッグ終了処理
@@ -679,13 +790,18 @@ function onPointerMove(e) {
         activePointerId = null;
     }
     
+    // [修正C] onPointerCancel のロジックを変更
     function onPointerCancel(e) {
         if (state.isScrollLocked && (isDragging || isDraggingBubble)) {
             e.preventDefault();
         }
+
+        // [修正C] 'null' モードのドラッグがキャンセルされたのでロック解除
+        if (state.currentTool === null) {
+            endAutoScrollLock();
+        }
         isDragging = false;
         isDraggingBubble = false;
-        endAutoScrollLock();
         activePointerId = null;
         
         if (bubbleEditor.style.display !== 'block') {
@@ -826,12 +942,19 @@ function onPointerMove(e) {
         return bubble;
     }
 
+    // [修正B-2] フキダシの当たり判定を拡大 (維持)
     function findBubbleAt(page, panel, x, y) {
         if (!page) return null;
+        // [修正B-2] スマホの指操作を考慮し、10pxの余白（パディング）を追加
+        const hitboxPadding = 10; 
         // [v15] page直下のbubblesを検索
         for (let i = page.bubbles.length - 1; i >= 0; i--) {
             const b = page.bubbles[i];
-            if (x >= b.x - b.w && x <= b.x && y >= b.y && y <= b.y + b.h) {
+            // [修正B-2] 判定ロジックに hitboxPadding を適用
+            if (x >= b.x - b.w - hitboxPadding && 
+                x <= b.x + hitboxPadding && 
+                y >= b.y - hitboxPadding && 
+                y <= b.y + b.h + hitboxPadding) {
                 return b;
             }
         }
@@ -843,8 +966,11 @@ function onPointerMove(e) {
         state.selectedBubbleId = bubble.id;
         bubbleEditor.value = bubble.text;
         bubbleEditor.style.display = 'block';
-        bubbleEditor.style.fontSize = `${bubble.font}px`;
+        
+        // [修正A] ズーム対策のため、入力欄のフォントは16px固定 (維持)
+        bubbleEditor.style.fontSize = '16px';
         bubbleEditor.style.lineHeight = `${BUBBLE_LINE_HEIGHT}`;
+        
         updateBubbleEditorPosition(bubble);
         bubbleEditor.focus();
         if (bubble.text) {
@@ -905,12 +1031,17 @@ function onBubbleEditorInput(e) {
     
     function onBubbleEditorKeyDown(e) { /* Escはグローバルで処理 */ }
 
-    // 縦書き用のサイズ測定
+    // [修正] 縦書き用のサイズ測定に「枠無」処理を追加
     function measureBubbleSize(bubble) {
-        const { text, font } = bubble;
+        const { text, font, shape } = bubble; // [新規] shape を取得
         const lines = text.split('\n');
         const columnWidth = font * BUBBLE_LINE_HEIGHT; 
         const charHeight = font * BUBBLE_LINE_HEIGHT * 0.9; 
+        
+        // [新規] 枠無用の余白を適用
+        const paddingX = (shape === 'none') ? BUBBLE_PADDING_NONE : BUBBLE_PADDING_X;
+        const paddingY = (shape === 'none') ? BUBBLE_PADDING_NONE : BUBBLE_PADDING_Y;
+
         let maxHeight = 0;
         lines.forEach(line => {
             const height = line.length * charHeight;
@@ -920,8 +1051,8 @@ function onBubbleEditorInput(e) {
              maxHeight = font;
         }
         const totalWidth = lines.length * columnWidth;
-        bubble.w = totalWidth + BUBBLE_PADDING_X * 2;
-        bubble.h = maxHeight + BUBBLE_PADDING_Y * 2;
+        bubble.w = totalWidth + paddingX * 2;
+        bubble.h = maxHeight + paddingY * 2;
     }
 
     function getSelectedBubble(page = getCurrentPage()) {
@@ -943,6 +1074,7 @@ function onBubbleEditorInput(e) {
         const bubble = getSelectedBubble();
         if (bubble) {
             bubble.shape = shape;
+            measureBubbleSize(bubble); // [新規] 枠無はサイズが変わるため再計算
             saveAndRenderActivePage();
         }
     }

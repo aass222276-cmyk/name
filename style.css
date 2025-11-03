@@ -7,6 +7,7 @@
     --gutter-v: 9px;  /* 縦ガター幅 */
     --padding-bubble-x: 10px; /* 縦書きの左右余白 */
     --padding-bubble-y: 8px;  /* 上下の余白 */
+    --padding-bubble-none: 2px; /* [新規] 枠なしの余白 */
 }
 
 body, html {
@@ -217,19 +218,33 @@ body, html {
 #bubbleEditor::-webkit-scrollbar { height: 6px; }
 #bubbleEditor::-webkit-scrollbar-thumb { background-color: #888; }
 
-/* --- 選択パネル --- */
+/* --- [修正] 画面下部UIのラッパー --- */
+#bottomBar {
+    position: fixed;
+    bottom: 20px;
+    left: 20px; /* 左端の余白 */
+    z-index: 20;
+    display: flex;
+    flex-wrap: nowrap;
+    /* [修正] gapは使わず、marginで個別に指定 */
+    align-items: flex-end; /* ボタンの高さを下揃え */
+    pointer-events: none; /* ラッパー自体はタップを透過 */
+}
+#bottomBar > * {
+    pointer-events: auto; /* 子要素（ボタンやパネル）はタップ可能 */
+    flex-shrink: 0; /* 縮まない */
+}
+
+/* --- [修正] 選択パネルのスタイル（位置指定を削除） --- */
 .selection-panel {
-    position: fixed; 
-    bottom: 20px; 
-    left: 50%;
-    transform: translateX(-50%);
+    /* [修正] position, bottom, left, transform を削除 */
     background: rgba(50, 50, 50, 0.9);
     border: 1px solid #888;
     border-radius: 6px;
     padding: 5px;
     display: none;
     gap: 5px;
-    z-index: 20;
+    /* [修正] z-indexはbottomBarが持つので不要 */
 }
 .selection-panel.show {
     display: flex;
@@ -254,12 +269,39 @@ body, html {
     font-weight: bold;
     height: 60px; 
 }
-.selection-panel button.delete {
-    background: #c00;
+/* [修正] 重複していた .delete 定義を削除 */
+
+/* [修正] セリフコマンドに隙間を追加 */
+#selectionPanelBubble {
+    margin-left: 5px; /* リセットパネルとの隙間 */
 }
-.selection-panel button.delete:hover {
-    background: #e00;
+
+/* [修正] ツールリセットパネルの位置と隙間 */
+#toolResetPanel {
+    order: -1; /* ロックボタンの右に来るよう、表示順を調整 */
+    margin-left: 10px; /* ロックボタンとの隙間 */
 }
+
+/* [修正] ツールリセットパネル内のボタンスタイル（位置指定削除） */
+#toolResetPanel button {
+    display: none; /* JSで .show をつけるまで非表示 */
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    height: 60px;
+    width: auto;
+    min-width: 65px;
+    padding: 4px 8px;
+    line-height: 1.2;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-align: center;
+    box-sizing: border-box;
+    white-space: normal;
+}
+#toolResetPanel button.show {
+    display: block;
+}
+
 
 /* --- ページ番号表示 --- */
 #pageIndicator {
@@ -276,31 +318,26 @@ body, html {
     pointer-events: none; /* タップを透過 */
 }
 
-/* [fix] 左下ロックボタンを横書き・1行表示に */
+/* [修正] ロックボタンのスタイル（縦書き・縦の四角） */
 #scrollLockBtn {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  z-index: 20;
+  order: -2; /* 一番左に配置 */
 
   background: #666;
   border: 1px solid #888;
   color: white;
 
-  /* ←ここを調整 */
-  writing-mode: horizontal-tb;
-  text-orientation: mixed;
-  white-space: nowrap;       /* 改行しない */
-  width: auto;               /* 固定幅やめる */
-  min-width: 70px;           /* お好みで縮めてOK */
-  height: 36px;              /* 縦長やめる */
-  padding: 6px 10px;         /* 余白調整 */
-  display: inline-flex;      /* 横並び維持 */
-  align-items: center;
-  justify-content: center;
-  line-height: 1.2;
-  font-size: 0.9rem;
-  border-radius: 4px;
+  /* [修正] <br>タグによる強制改行（縦積み）スタイル */
+  /* writing-mode を削除 */
+  white-space: normal;      /* <br> を有効にする */
+  text-align: center;         /* テキストを中央揃え */
+  width: 36px;                /* 幅を固定 (縦長にする) */
+  height: 60px;               /* 高さを60pxに */
+  min-width: auto;        
+  padding: 8px 4px;       /* [修正] 上下パディングを調整 */
+  line-height: 1.1;       /* [修正] 行間を詰めて3行入るようにする */
+  font-size: 0.8rem;      
+  font-weight: bold;
+  border-radius: 4px;     /* 四角 */
   box-sizing: border-box;
 }
 #scrollLockBtn.active {
@@ -317,31 +354,29 @@ body, html {
     opacity: 0;
 }
 
-/* 落ち着いた暗赤（少し赤寄り） */
-#toolbar #btnResetPanels,
+/* [修正] 赤ボタンの定義を更新 */
 #toolbar #btnPageDelete,
-#toolbar #btnResetBubbles,
-#toolbar #btnReset {
+#toolbar #btnReset,
+#toolResetPanel #btnResetPanels,
+#toolResetPanel #btnResetBubbles,
+#selectionPanelBubble #deleteBubble { 
   background: #5c1f1f !important;   /* base */
   color: #fff !important;
   border: 1px solid #3a1414 !important;
 }
-#toolbar #btnResetPanels:hover,
 #toolbar #btnPageDelete:hover,
-#toolbar #btnResetBubbles:hover,
-#toolbar #btnReset:hover {
+#toolbar #btnReset:hover,
+#toolResetPanel #btnResetPanels:hover,
+#toolResetPanel #btnResetBubbles:hover,
+#selectionPanelBubble #deleteBubble:hover {
   background: #772222 !important;   /* hover */
   border-color: #2c0f0f !important;
 }
-#toolbar #btnResetPanels:active,
 #toolbar #btnPageDelete:active,
-#toolbar #btnResetBubbles:active,
 #toolbar #btnReset:active,
-#toolbar #btnResetPanels.active,
-#toolbar #btnPageDelete.active,
-#toolbar #btnResetBubbles.active,
-#toolbar #btnReset.active {
+#toolResetPanel #btnResetPanels:active,
+#toolResetPanel #btnResetBubbles:active,
+#selectionPanelBubble #deleteBubble:active {
   background: #8b2a2a !important;   /* active */
   border-color: #3a1414 !important;
 }
-
