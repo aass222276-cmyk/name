@@ -264,26 +264,39 @@ body, html {
 
 /* --- フキダシ入力エリア --- */
 #bubbleEditor {
-    position: absolute;
+    /* [修正] position: absolute から fixed に変更 */
+    position: fixed; 
     display: none;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px dashed #007bff;
+    /* [修正] 見た目を調整 */
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid #007bff;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4); /* [新設] */
+    
     box-sizing: border-box;
     overflow-y: auto;
     resize: none;
     outline: none;
     font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
-    z-index: 10;
+    
+    /* [修正] z-indexをツールバー(100)より上にする */
+    z-index: 101; 
+    
     writing-mode: vertical-rl;
     white-space: pre; 
     padding: var(--padding-bubble-y) var(--padding-bubble-x);
     line-height: 1.2; 
     scrollbar-width: thin;
     
-    left: 0;
-    top: 0;
-    transform: translate(0, 0);
-    will-change: transform;
+    /* --- [新設] 画面中央（やや上）に固定 --- */
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* --- 以下の古い座標指定を削除 --- */
+    /* left: 0; */
+    /* top: 0; */
+    /* transform: translate(0, 0); */
+    /* will-change: transform; */
+    
     touch-action: none; 
     text-orientation: mixed; /* [修正済] */
     letter-spacing: 0;

@@ -1,4 +1,4 @@
-たかしまネームエディタ
+# Manga Name Editor (v3)
 
 ネーム（下書き）段階の“テキストとコマ割り”を最速で決めるための極小エディタ。
 GitHub Pagesで動作するPWA（プログレッシブ・ウェブアプリ）です。
@@ -33,6 +33,5 @@ GitHub Pagesで動作するPWA（プログレッシブ・ウェブアプリ）�
 `const SW_VERSION = 'manganame-v3.0.0';`
 ↓
 `const SW_VERSION = 'manganame-v3.0.1';`
-
 
 変更をコミット＆プッシュすると、次にアクセスした際に新しいバージョンがインストールされます。

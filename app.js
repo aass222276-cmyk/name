@@ -1210,29 +1210,35 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUI();
         renderActivePage();
     }
-    // [修正済] 画面中央固定
+    
+    // ========== [ここから修正] ==========
+    // [修正] 編集エリアはCSSで画面中央に固定
+    // JSはフキダシのサイズ(w, h)の更新のみを担当する
     function updateBubbleEditorPosition(bubble) {
-      const el = pageElements[state.currentPageIndex];
-      if (!el) return;
-      const r = el.mainCanvas.getBoundingClientRect(); // mainCanvas を基準に
       const w = bubble.w; 
       const h = bubble.h;
       bubbleEditor.style.width  = `${w}px`;
       bubbleEditor.style.height = `${h}px`;
-      const left = r.left + bubble.x - w;   
-      const viewportTop = r.top + bubble.y;
-      const viewportCenterY = window.innerHeight / 2;
-      const pageScrollY = window.scrollY || document.documentElement.scrollTop;
-      let finalAbsTop; 
-      if (viewportTop > viewportCenterY) {
-          finalAbsTop = pageScrollY + viewportCenterY;
-      } else {
-          finalAbsTop = viewportTop + pageScrollY;
-      }
-      bubbleEditor.style.transform = `translate(${left}px, ${finalAbsTop}px)`;
-      bubbleEditor.style.left = '0px';
-      bubbleEditor.style.top  = '0px';
+      
+      // 座標計算はすべてCSS側に移管したため、JSでの処理は不要
+      // const el = pageElements[state.currentPageIndex];
+      // const r = el.mainCanvas.getBoundingClientRect(); 
+      // const left = r.left + bubble.x - w;   
+      // const viewportTop = r.top + bubble.y;
+      // const viewportCenterY = window.innerHeight / 2;
+      // const pageScrollY = window.scrollY || document.documentElement.scrollTop;
+      // let finalAbsTop; 
+      // if (viewportTop > viewportCenterY) {
+      //     finalAbsTop = pageScrollY + viewportCenterY;
+      // } else {
+      //     finalAbsTop = viewportTop + pageScrollY;
+      // }
+      // bubbleEditor.style.transform = `translate(${left}px, ${finalAbsTop}px)`;
+      // bubbleEditor.style.left = '0px';
+      // bubbleEditor.style.top  = '0px';
     }
+    // ========== [ここまで修正] ==========
+
     function hideBubbleEditor() {
         if (bubbleEditor.style.display === 'block') {
             bubbleEditor.style.display = 'none';
